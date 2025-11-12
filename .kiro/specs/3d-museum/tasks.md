@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Set up project structure and dependencies
+- [x] 1. Set up project structure and dependencies
 
   - Initialize Next.js 16+ project with App Router and TypeScript
   - Install Three.js, React Three Fiber, and Drei helpers

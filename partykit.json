@@ -1,0 +1,5 @@
+{
+  "name": "3d-museum",
+  "main": "party/museum.ts",
+  "compatibilityDate": "2024-01-01"
+}
