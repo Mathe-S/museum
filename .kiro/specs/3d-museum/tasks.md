@@ -15,7 +15,7 @@
   - Set up environment variables structure (including Partykit host and secret)
   - _Requirements: 1.1, 1.2, 16.1_
 
-- [ ] 2. Configure authentication with Clerk
+- [x] 2. Configure authentication with Clerk
 
   - Set up Clerk provider in root layout
   - Configure Google OAuth provider in Clerk dashboard
