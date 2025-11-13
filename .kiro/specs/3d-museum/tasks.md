@@ -84,7 +84,7 @@
   - Extract theme colors from uploaded images using color-thief library
   - _Requirements: 6.4, 6.5, 9.2, 9.3, 15.1_
 
-- [ ] 8. Implement AI image generation in image router
+- [x] 8. Implement AI image generation in image router
 
   - Add `image.generate` mutation to image router
   - Integrate Google Imagen API client

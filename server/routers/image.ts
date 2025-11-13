@@ -4,6 +4,7 @@ import { Storage } from "@google-cloud/storage";
 import { createId } from "@paralleldrive/cuid2";
 import sharp from "sharp";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { generateImage } from "../../lib/imagen";
 
 // Lazy initialization of Google Cloud Storage
 let storage: Storage | null = null;
@@ -235,6 +236,136 @@ export const imageRouter = createTRPCRouter({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to generate signed URL.",
+        });
+      }
+    }),
+
+  /**
+   * Generate AI image using Google Imagen
+   * - Accepts prompt text and optional style preset
+   * - Maps style presets to Imagen parameters
+   * - Generates image via Google Imagen API
+   * - Processes and optimizes generated image
+   * - Stores in Google Cloud Storage
+   * - Extracts theme colors
+   */
+  generate: protectedProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1).max(1000),
+        style: z
+          .enum(["van-gogh", "impressionist", "realistic", "abstract", "watercolor"])
+          .optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      try {
+        // Generate image using Google Imagen API
+        const { imageData } = await generateImage({
+          prompt: input.prompt,
+          style: input.style,
+        });
+
+        // Generate unique ID for this image set
+        const imageId = createId();
+
+        // Process the generated image with sharp
+        const image = sharp(imageData);
+        const metadata = await image.metadata();
+
+        // Generate multiple sizes
+        const sizes = {
+          thumbnail: { width: 256, height: 256 },
+          medium: { width: 1024, height: 1024 },
+          full: { width: 2048, height: 2048 },
+        };
+
+        const uploadPromises: Promise<string>[] = [];
+        const urls: Record<string, string> = {};
+
+        for (const [sizeName, dimensions] of Object.entries(sizes)) {
+          // Resize and convert to WebP
+          const processedBuffer = await image
+            .resize(dimensions.width, dimensions.height, {
+              fit: "inside",
+              withoutEnlargement: true,
+            })
+            .webp({ quality: 85 })
+            .toBuffer();
+
+          const filename = `images/${imageId}/${sizeName}.webp`;
+          const uploadPromise = uploadToGCS(
+            processedBuffer,
+            filename,
+            "image/webp"
+          );
+          uploadPromises.push(uploadPromise);
+          urls[sizeName] = filename;
+        }
+
+        // Wait for all uploads to complete
+        await Promise.all(uploadPromises);
+
+        // Extract theme colors from the medium size
+        const mediumBuffer = await image
+          .resize(1024, 1024, {
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .toBuffer();
+
+        const themeColors = await extractThemeColors(mediumBuffer);
+
+        return {
+          imageId,
+          urls: {
+            thumbnail: urls.thumbnail,
+            medium: urls.medium,
+            full: urls.full,
+          },
+          themeColors,
+          metadata: {
+            width: metadata.width,
+            height: metadata.height,
+            format: metadata.format,
+          },
+          prompt: input.prompt,
+          style: input.style,
+        };
+      } catch (error) {
+        console.error("Error generating image:", error);
+        
+        // Handle specific error types
+        if (error instanceof Error) {
+          // Rate limit errors
+          if (error.message.includes("Rate limit")) {
+            throw new TRPCError({
+              code: "TOO_MANY_REQUESTS",
+              message: "Rate limit exceeded. Please try again in a few moments.",
+            });
+          }
+          
+          // Quota/permission errors
+          if (error.message.includes("quota") || error.message.includes("access denied")) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "API quota exceeded or access denied. Please contact support.",
+            });
+          }
+          
+          // API configuration errors
+          if (error.message.includes("not configured")) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Image generation service is not properly configured.",
+            });
+          }
+        }
+        
+        // Generic error
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to generate image. Please try again.",
         });
       }
     }),
