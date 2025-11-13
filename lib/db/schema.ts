@@ -8,6 +8,7 @@ import {
   unique,
   index,
 } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 
 export const users = pgTable("users", {
@@ -94,3 +95,36 @@ export const comments = pgTable(
     createdAtIdx: index("comments_created_at_idx").on(table.createdAt),
   })
 );
+
+// Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  museums: many(museums),
+  comments: many(comments),
+}));
+
+export const museumsRelations = relations(museums, ({ one, many }) => ({
+  user: one(users, {
+    fields: [museums.userId],
+    references: [users.id],
+  }),
+  frames: many(frames),
+}));
+
+export const framesRelations = relations(frames, ({ one, many }) => ({
+  museum: one(museums, {
+    fields: [frames.museumId],
+    references: [museums.id],
+  }),
+  comments: many(comments),
+}));
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+  frame: one(frames, {
+    fields: [comments.frameId],
+    references: [frames.id],
+  }),
+  user: one(users, {
+    fields: [comments.userId],
+    references: [users.id],
+  }),
+}));

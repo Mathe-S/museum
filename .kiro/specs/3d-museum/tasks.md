@@ -47,7 +47,7 @@
   - Create seed script with test data for development
   - _Requirements: 1.2, 9.1, 9.2, 9.3, 11.1, 12.2, 17.4_
 
-- [ ] 5. Implement museum tRPC router
+- [x] 5. Implement museum tRPC router
 
   - Create museum router at `/server/routers/museum.ts`
   - Implement `museum.list` query to list user's museums
