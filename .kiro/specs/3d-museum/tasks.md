@@ -60,7 +60,7 @@
   - Define Zod schemas for input validation
   - _Requirements: 11.1, 11.3, 12.1, 12.2, 12.3_
 
-- [ ] 6. Implement frame tRPC router
+- [x] 6. Implement frame tRPC router
 
   - Create frame router at `/server/routers/frame.ts`
   - Implement `frame.listByMuseum` query to list all frames in museum
