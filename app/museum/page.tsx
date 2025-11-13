@@ -90,7 +90,10 @@ export default function MuseumPage() {
   return (
     <div className="relative h-screen w-screen">
       {/* 3D Scene */}
-      <MuseumSceneManager collisionBoundaries={collisionBoundaries}>
+      <MuseumSceneManager 
+        collisionBoundaries={collisionBoundaries}
+        navigationEnabled={!isNavigationPaused}
+      >
         <MuseumLayout 
           frames={testFrames} 
           onCollisionBoundariesReady={handleCollisionBoundariesReady}

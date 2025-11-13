@@ -10,9 +10,10 @@ import { MobileControls, VirtualJoystick } from "./MobileControls";
 interface MuseumSceneManagerProps {
   children?: React.ReactNode;
   collisionBoundaries?: THREE.Box3[];
+  navigationEnabled?: boolean;
 }
 
-export function MuseumSceneManager({ children, collisionBoundaries = [] }: MuseumSceneManagerProps) {
+export function MuseumSceneManager({ children, collisionBoundaries = [], navigationEnabled = true }: MuseumSceneManagerProps) {
   const themeMode = useMuseumStore((state) => state.themeMode);
   const [isMobile, setIsMobile] = useState(false);
   const [joystickDirection, setJoystickDirection] = useState({ x: 0, y: 0 });
@@ -71,14 +72,14 @@ export function MuseumSceneManager({ children, collisionBoundaries = [] }: Museu
 
       {/* Desktop navigation controls (WASD + mouse) */}
       {!isMobile && collisionBoundaries.length > 0 && (
-        <DesktopControls collisionBoundaries={collisionBoundaries} enabled={true} />
+        <DesktopControls collisionBoundaries={collisionBoundaries} enabled={navigationEnabled} />
       )}
 
       {/* Mobile navigation controls (joystick + touch drag) */}
       {isMobile && collisionBoundaries.length > 0 && (
         <MobileControls 
           collisionBoundaries={collisionBoundaries} 
-          enabled={true}
+          enabled={navigationEnabled}
           joystickDirection={joystickDirection}
         />
       )}

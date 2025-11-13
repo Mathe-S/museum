@@ -183,7 +183,7 @@
   - Use tRPC mutations for all actions (upload, generate, delete, share)
   - _Requirements: 6.1, 6.2, 6.3, 7.1, 7.2, 7.3, 8.1, 8.2, 8.3, 8.4_
 
-- [ ] 17. Implement frame interaction logic
+- [x] 17. Implement frame interaction logic
 
   - Add click event listener to Frame Entity components
   - Open Frame Interaction Modal with appropriate state (empty/filled)
