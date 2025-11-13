@@ -128,7 +128,7 @@
   - Enable frustum culling and occlusion
   - _Requirements: 10.1, 10.2, 10.3, 15.4_
 
-- [ ] 12. Build Museum Layout Generator
+- [x] 12. Build Museum Layout Generator
 
   - Create function to generate Main Hall geometry (walls, floor, ceiling)
   - Position 9 frame entities in 3x3 grid on back wall of Main Hall
