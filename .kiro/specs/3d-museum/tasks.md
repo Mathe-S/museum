@@ -105,7 +105,7 @@
   - Implement rate limiting middleware for public procedures
   - _Requirements: 12.4, 13.3, 14.1_
 
-- [ ] 10. Create Zustand store for global state
+- [x] 10. Create Zustand store for global state
 
   - Define MuseumStore interface with current museum, frames, and UI state
   - Implement actions for setting museum, updating frames, deleting frames
@@ -117,7 +117,7 @@
   - Note: React Query handles server state, Zustand for 3D/UI state only
   - _Requirements: 10.4, 2.4, 16.2, 16.3, 16.4_
 
-- [ ] 11. Build Museum Scene Manager component
+- [x] 11. Build Museum Scene Manager component
 
   - Initialize Three.js scene with WebGLRenderer
   - Configure renderer settings for performance (powerPreference, pixelRatio)
