@@ -62,13 +62,15 @@ graph TB
 
 - **Frontend Framework**: Next.js 16+ (App Router)
 - **3D Rendering**: Three.js with React Three Fiber
+- **API Layer**: tRPC for end-to-end type-safe APIs
+- **Data Fetching**: TanStack Query (React Query) for caching and state management
 - **Authentication**: Clerk with Google OAuth provider
 - **Database**: Neon Postgres (serverless)
 - **ORM**: Drizzle ORM
 - **Real-time Multiplayer**: Partykit for presence and live updates
 - **Image Storage**: Google Cloud Storage
 - **AI Image Generation**: Google Imagen API
-- **State Management**: Zustand for global state
+- **State Management**: Zustand for global 3D/UI state
 - **Styling**: Tailwind CSS for UI components
 - **Mobile Controls**: React Joystick Component
 
@@ -290,45 +292,64 @@ type VisitorLeft = {
 - Relative timestamp ("2 minutes ago")
 - Delete button (conditional)
 
-### Backend API Routes
+### tRPC API Router Structure
 
-#### Authentication Routes
+**Authentication Routes** (`auth` router):
 
-- `POST /api/auth/callback` - Clerk webhook for user creation
-- `GET /api/auth/session` - Get current user session
+- `auth.callback` - Clerk webhook for user creation (mutation)
+- `auth.session` - Get current user session (query)
 
-#### Museum Routes
+**Museum Routes** (`museum` router):
 
-- `GET /api/museums` - List user's museums
-- `POST /api/museums` - Create new museum
-- `GET /api/museums/[id]` - Get museum details
-- `PATCH /api/museums/[id]` - Update museum (name, public status)
-- `DELETE /api/museums/[id]` - Delete museum
-- `GET /api/museums/[id]/share` - Generate share link
+- `museum.list` - List user's museums (query)
+- `museum.create` - Create new museum (mutation)
+- `museum.getById` - Get museum details by ID (query)
+- `museum.update` - Update museum name and public status (mutation)
+- `museum.delete` - Delete museum (mutation)
+- `museum.generateShareLink` - Generate unique share token (mutation)
 
-#### Frame Routes
+**Frame Routes** (`frame` router):
 
-- `GET /api/museums/[id]/frames` - List frames in museum
-- `POST /api/museums/[id]/frames` - Create/update frame
-- `DELETE /api/museums/[id]/frames/[frameId]` - Delete frame
-- `GET /api/frames/[id]/share` - Generate frame share link
+- `frame.listByMuseum` - List all frames in a museum (query)
+- `frame.create` - Create or update frame with image (mutation)
+- `frame.delete` - Remove frame image (mutation)
+- `frame.generateShareLink` - Generate frame-specific share token (mutation)
 
-#### Image Routes
+**Image Routes** (`image` router):
 
-- `POST /api/images/upload` - Upload image to Google Cloud Storage
-- `POST /api/images/generate` - Generate image with Google Imagen
-- `GET /api/images/[id]` - Get signed URL for image
+- `image.upload` - Upload image to Google Cloud Storage (mutation)
+- `image.generate` - Generate image with Google Imagen (mutation)
+- `image.getSignedUrl` - Get signed URL for image (query)
 
-#### Public Routes (no auth required)
+**Public Routes** (`public` router - no auth required):
 
-- `GET /api/public/museums/[shareId]` - Get public museum data
-- `GET /api/public/frames/[shareId]` - Get frame data with spawn position
+- `public.getMuseumByShareToken` - Get public museum data (query)
+- `public.getFrameByShareToken` - Get frame data with spawn position (query)
 
-#### Comment Routes
+**Comment Routes** (`comment` router):
 
-- `GET /api/frames/[id]/comments` - Get all comments for a frame
-- `POST /api/frames/[id]/comments` - Create new comment (auth optional)
-- `DELETE /api/comments/[id]` - Delete comment (owner only)
+- `comment.listByFrame` - Get all comments for a frame (query)
+- `comment.create` - Create new comment, auth optional (mutation)
+- `comment.delete` - Delete comment, owner only (mutation)
+
+**tRPC Client Usage Examples**:
+
+```typescript
+// Query with React Query
+const { data: museums } = trpc.museum.list.useQuery();
+
+// Mutation with optimistic updates
+const createMuseum = trpc.museum.create.useMutation({
+  onSuccess: () => {
+    utils.museum.list.invalidate();
+  },
+});
+
+// Public access (no auth)
+const { data: museum } = trpc.public.getMuseumByShareToken.useQuery({
+  shareToken,
+});
+```
 
 ### Partykit Server
 
@@ -621,9 +642,10 @@ interface Visitor {
 
 2. **API Response Caching**
 
-   - Cache museum data in localStorage
-   - Use SWR or React Query for automatic revalidation
-   - Implement optimistic updates for better UX
+   - React Query automatically caches tRPC responses
+   - Configure stale time for museum/frame data (5 minutes)
+   - Implement optimistic updates for mutations
+   - Use React Query devtools for debugging cache
 
 3. **Code Splitting**
    - Lazy load Three.js components
@@ -655,9 +677,9 @@ interface Visitor {
 
 **Backend (Jest)**:
 
-- API route handlers
+- tRPC router procedures
 - Database query functions
-- Authentication middleware
+- tRPC middleware (authentication, rate limiting)
 - Image upload/generation logic
 - Share link generation
 
@@ -670,12 +692,12 @@ interface Visitor {
 
 ### Integration Tests
 
-**API Integration (Supertest)**:
+**tRPC Integration**:
 
-- Full API workflows (create museum → add frames → share)
-- Authentication flows
-- Public access scenarios
-- Error handling paths
+- Full tRPC workflows (create museum → add frames → share)
+- Authentication flows with tRPC context
+- Public router access scenarios
+- Error handling and validation with Zod schemas
 
 **Database Integration**:
 
@@ -792,6 +814,7 @@ GOOGLE_CLOUD_CREDENTIALS=
 GOOGLE_IMAGEN_API_KEY=
 NEXT_PUBLIC_PARTYKIT_HOST=
 PARTYKIT_SECRET=
+NEXT_PUBLIC_TRPC_URL=
 ```
 
 2. **Database Migrations**
