@@ -14,9 +14,10 @@ interface Frame {
 interface MuseumLayoutProps {
   frames: Frame[];
   onCollisionBoundariesReady?: (boundaries: THREE.Box3[]) => void;
+  onFrameClick?: (frameId: string) => void;
 }
 
-export function MuseumLayout({ frames, onCollisionBoundariesReady }: MuseumLayoutProps) {
+export function MuseumLayout({ frames, onCollisionBoundariesReady, onFrameClick }: MuseumLayoutProps) {
   const { mainHallGeometry, extendableHallGeometry, collisionBoundaries } =
     useMemo(() => {
       const geometry = generateMuseumGeometry(frames);
@@ -36,7 +37,7 @@ export function MuseumLayout({ frames, onCollisionBoundariesReady }: MuseumLayou
       <ExtendableHall geometry={extendableHallGeometry} />
 
       {/* Frame Positions */}
-      <FramePositions frames={frames} />
+      <FramePositions frames={frames} onFrameClick={onFrameClick} />
 
       {/* Portal at end of Extendable Hall */}
       <Portal position={extendableHallGeometry.portalPosition} />
@@ -274,15 +275,10 @@ function ExtendableHall({ geometry }: { geometry: any }) {
 }
 
 // Frame Positions component
-function FramePositions({ frames }: { frames: Frame[] }) {
+function FramePositions({ frames, onFrameClick }: { frames: Frame[]; onFrameClick?: (frameId: string) => void }) {
   const framePositions = useMemo(() => {
     return calculateFramePositions(frames);
   }, [frames]);
-
-  const handleFrameClick = (frameId: string) => {
-    // TODO: Open Frame Interaction Modal (will be implemented in task 16)
-    console.log("Frame clicked:", frameId);
-  };
 
   return (
     <>
@@ -293,7 +289,7 @@ function FramePositions({ frames }: { frames: Frame[] }) {
           position={framePos.position}
           rotation={framePos.rotation}
           imageUrl={framePos.imageUrl}
-          onFrameClick={handleFrameClick}
+          onFrameClick={onFrameClick}
         />
       ))}
     </>

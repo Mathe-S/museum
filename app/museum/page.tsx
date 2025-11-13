@@ -2,6 +2,7 @@
 
 import { MuseumSceneManager } from "@/components/museum/MuseumSceneManager";
 import { MuseumLayout } from "@/components/museum/MuseumLayout";
+import { FrameInteractionModal } from "@/components/museum/FrameInteractionModal";
 import { useMuseumStore } from "@/lib/store/museum-store";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import * as THREE from "three";
@@ -9,8 +10,53 @@ import * as THREE from "three";
 export default function MuseumPage() {
   const themeMode = useMuseumStore((state) => state.themeMode);
   const toggleTheme = useMuseumStore((state) => state.toggleTheme);
+  const selectedFrame = useMuseumStore((state) => state.selectedFrame);
+  const setSelectedFrame = useMuseumStore((state) => state.setSelectedFrame);
+  const frames = useMuseumStore((state) => state.frames);
+  const setFrames = useMuseumStore((state) => state.setFrames);
+  
   const [collisionBoundaries, setCollisionBoundaries] = useState<THREE.Box3[]>([]);
   const [isMobile, setIsMobile] = useState(false);
+  const [isNavigationPaused, setIsNavigationPaused] = useState(false);
+
+  // Test data: Create frames for demonstration
+  const testFrames = useMemo(() => {
+    const framesList = [];
+    
+    // Main Hall: 9 frames (positions 0-8)
+    for (let i = 0; i < 9; i++) {
+      framesList.push({
+        id: `frame-${i}`,
+        museumId: "test-museum",
+        position: i,
+        side: null,
+        imageUrl: i % 3 === 0 ? "test-image.jpg" : null, // Some filled, some empty
+        description: i % 3 === 0 ? `Test frame ${i}` : null,
+        themeColors: i % 3 === 0 ? ["#ff0000", "#00ff00", "#0000ff"] : null,
+        shareToken: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+    
+    // Extendable Hall: 6 frames (positions 9-14) alternating left-right
+    for (let i = 9; i < 15; i++) {
+      framesList.push({
+        id: `frame-${i}`,
+        museumId: "test-museum",
+        position: i,
+        side: (i - 9) % 2 === 0 ? "left" : "right",
+        imageUrl: i % 4 === 0 ? "test-image.jpg" : null,
+        description: i % 4 === 0 ? `Test frame ${i}` : null,
+        themeColors: i % 4 === 0 ? ["#ff0000", "#00ff00", "#0000ff"] : null,
+        shareToken: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+    
+    return framesList;
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -21,36 +67,25 @@ export default function MuseumPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Initialize frames in store
+  useEffect(() => {
+    setFrames(testFrames);
+  }, [testFrames, setFrames]);
+
   const handleCollisionBoundariesReady = useCallback((boundaries: THREE.Box3[]) => {
     setCollisionBoundaries(boundaries);
   }, []);
 
-  // Test data: Create frames for demonstration
-  const testFrames = useMemo(() => {
-    const frames = [];
-    
-    // Main Hall: 9 frames (positions 0-8)
-    for (let i = 0; i < 9; i++) {
-      frames.push({
-        id: `frame-${i}`,
-        position: i,
-        side: null,
-        imageUrl: i % 3 === 0 ? "test-image.jpg" : null, // Some filled, some empty
-      });
+  const handleFrameClick = useCallback((frameId: string) => {
+    const frame = frames.find((f) => f.id === frameId);
+    if (frame) {
+      setSelectedFrame(frame);
     }
-    
-    // Extendable Hall: 6 frames (positions 9-14) alternating left-right
-    for (let i = 9; i < 15; i++) {
-      frames.push({
-        id: `frame-${i}`,
-        position: i,
-        side: (i - 9) % 2 === 0 ? "left" : "right",
-        imageUrl: i % 4 === 0 ? "test-image.jpg" : null,
-      });
-    }
-    
-    return frames;
-  }, []);
+  }, [frames, setSelectedFrame]);
+
+  const handleModalClose = useCallback(() => {
+    setSelectedFrame(null);
+  }, [setSelectedFrame]);
 
   return (
     <div className="relative h-screen w-screen">
@@ -59,8 +94,16 @@ export default function MuseumPage() {
         <MuseumLayout 
           frames={testFrames} 
           onCollisionBoundariesReady={handleCollisionBoundariesReady}
+          onFrameClick={handleFrameClick}
         />
       </MuseumSceneManager>
+
+      {/* Frame Interaction Modal */}
+      <FrameInteractionModal
+        frame={selectedFrame}
+        onClose={handleModalClose}
+        onNavigationPause={setIsNavigationPaused}
+      />
 
       {/* UI Overlay - Theme Toggle */}
       <div className="absolute top-4 right-4 z-10">
@@ -86,6 +129,9 @@ export default function MuseumPage() {
             ? "Use the joystick to move and drag the screen to look around."
             : "Click to lock pointer, then use WASD to move and mouse to look around. Press ESC to unlock."
           }
+        </p>
+        <p className="text-xs opacity-75 mt-1">
+          Click on frames to interact with them. Navigation is {isNavigationPaused ? "paused" : "active"}.
         </p>
       </div>
     </div>

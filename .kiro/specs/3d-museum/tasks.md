@@ -160,7 +160,7 @@
   - Lock pointer on canvas click, unlock on ESC
   - _Requirements: 3.1, 3.2_
 
-- [-] 15. Implement mobile navigation controls
+- [x] 15. Implement mobile navigation controls
 
   - Add virtual joystick component for movement (bottom-left position)
   - Implement touch drag for camera rotation
@@ -169,7 +169,7 @@
   - Add collision detection for mobile movement
   - _Requirements: 3.3, 3.4_
 
-- [ ] 16. Build Frame Interaction Modal component
+- [x] 16. Build Frame Interaction Modal component
 
   - Create modal UI with backdrop and close button
   - Implement empty frame state: Upload, Camera Capture, AI Generate sections
