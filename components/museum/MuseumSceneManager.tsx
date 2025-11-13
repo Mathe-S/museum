@@ -2,9 +2,10 @@
 
 import { Canvas } from "@react-three/fiber";
 import { useMuseumStore } from "@/lib/store/museum-store";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import * as THREE from "three";
 import { DesktopControls } from "./DesktopControls";
+import { MobileControls, VirtualJoystick } from "./MobileControls";
 
 interface MuseumSceneManagerProps {
   children?: React.ReactNode;
@@ -14,6 +15,7 @@ interface MuseumSceneManagerProps {
 export function MuseumSceneManager({ children, collisionBoundaries = [] }: MuseumSceneManagerProps) {
   const themeMode = useMuseumStore((state) => state.themeMode);
   const [isMobile, setIsMobile] = useState(false);
+  const [joystickDirection, setJoystickDirection] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     // Detect if device is mobile
@@ -27,7 +29,12 @@ export function MuseumSceneManager({ children, collisionBoundaries = [] }: Museu
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const handleJoystickChange = useCallback((x: number, y: number) => {
+    setJoystickDirection({ x, y });
+  }, []);
+
   return (
+    <>
     <Canvas
       camera={{
         fov: 75,
@@ -67,9 +74,21 @@ export function MuseumSceneManager({ children, collisionBoundaries = [] }: Museu
         <DesktopControls collisionBoundaries={collisionBoundaries} enabled={true} />
       )}
 
+      {/* Mobile navigation controls (joystick + touch drag) */}
+      {isMobile && collisionBoundaries.length > 0 && (
+        <MobileControls 
+          collisionBoundaries={collisionBoundaries} 
+          enabled={true}
+          joystickDirection={joystickDirection}
+        />
+      )}
+
       {/* Children components (museum layout, frames, etc.) */}
       {children}
     </Canvas>
+    {/* Virtual joystick overlay for mobile */}
+    {isMobile && <VirtualJoystick onDirectionChange={handleJoystickChange} />}
+    </>
   );
 }
 

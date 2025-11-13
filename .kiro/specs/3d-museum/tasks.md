@@ -160,7 +160,7 @@
   - Lock pointer on canvas click, unlock on ESC
   - _Requirements: 3.1, 3.2_
 
-- [ ] 15. Implement mobile navigation controls
+- [-] 15. Implement mobile navigation controls
 
   - Add virtual joystick component for movement (bottom-left position)
   - Implement touch drag for camera rotation

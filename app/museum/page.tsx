@@ -3,13 +3,23 @@
 import { MuseumSceneManager } from "@/components/museum/MuseumSceneManager";
 import { MuseumLayout } from "@/components/museum/MuseumLayout";
 import { useMuseumStore } from "@/lib/store/museum-store";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import * as THREE from "three";
 
 export default function MuseumPage() {
   const themeMode = useMuseumStore((state) => state.themeMode);
   const toggleTheme = useMuseumStore((state) => state.toggleTheme);
   const [collisionBoundaries, setCollisionBoundaries] = useState<THREE.Box3[]>([]);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768 || 'ontouchstart' in window);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleCollisionBoundariesReady = useCallback((boundaries: THREE.Box3[]) => {
     setCollisionBoundaries(boundaries);
@@ -72,7 +82,10 @@ export default function MuseumPage() {
           Main Hall: 9 frames in 3x3 grid | Extendable Hall: 6 frames alternating left-right | Portal at end
         </p>
         <p className="text-xs opacity-75 mt-1">
-          Click to lock pointer, then use WASD to move and mouse to look around. Press ESC to unlock.
+          {isMobile 
+            ? "Use the joystick to move and drag the screen to look around."
+            : "Click to lock pointer, then use WASD to move and mouse to look around. Press ESC to unlock."
+          }
         </p>
       </div>
     </div>
