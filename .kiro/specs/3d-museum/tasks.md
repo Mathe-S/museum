@@ -151,7 +151,7 @@
   - Compress textures to WebP and generate mipmaps
   - _Requirements: 5.1, 5.2, 5.3, 6.1, 15.1, 15.3_
 
-- [ ] 14. Implement desktop navigation controls
+- [x] 14. Implement desktop navigation controls
 
   - Integrate PointerLockControls for first-person camera
   - Implement WASD keyboard movement with 5 units/second speed

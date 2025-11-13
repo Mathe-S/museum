@@ -3,11 +3,17 @@
 import { MuseumSceneManager } from "@/components/museum/MuseumSceneManager";
 import { MuseumLayout } from "@/components/museum/MuseumLayout";
 import { useMuseumStore } from "@/lib/store/museum-store";
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
+import * as THREE from "three";
 
 export default function MuseumPage() {
   const themeMode = useMuseumStore((state) => state.themeMode);
   const toggleTheme = useMuseumStore((state) => state.toggleTheme);
+  const [collisionBoundaries, setCollisionBoundaries] = useState<THREE.Box3[]>([]);
+
+  const handleCollisionBoundariesReady = useCallback((boundaries: THREE.Box3[]) => {
+    setCollisionBoundaries(boundaries);
+  }, []);
 
   // Test data: Create frames for demonstration
   const testFrames = useMemo(() => {
@@ -39,8 +45,11 @@ export default function MuseumPage() {
   return (
     <div className="relative h-screen w-screen">
       {/* 3D Scene */}
-      <MuseumSceneManager>
-        <MuseumLayout frames={testFrames} />
+      <MuseumSceneManager collisionBoundaries={collisionBoundaries}>
+        <MuseumLayout 
+          frames={testFrames} 
+          onCollisionBoundariesReady={handleCollisionBoundariesReady}
+        />
       </MuseumSceneManager>
 
       {/* UI Overlay - Theme Toggle */}
@@ -63,7 +72,7 @@ export default function MuseumPage() {
           Main Hall: 9 frames in 3x3 grid | Extendable Hall: 6 frames alternating left-right | Portal at end
         </p>
         <p className="text-xs opacity-75 mt-1">
-          Use WASD to move (controls coming in next task)
+          Click to lock pointer, then use WASD to move and mouse to look around. Press ESC to unlock.
         </p>
       </div>
     </div>

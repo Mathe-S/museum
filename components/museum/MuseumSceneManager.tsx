@@ -2,15 +2,30 @@
 
 import { Canvas } from "@react-three/fiber";
 import { useMuseumStore } from "@/lib/store/museum-store";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import * as THREE from "three";
+import { DesktopControls } from "./DesktopControls";
 
 interface MuseumSceneManagerProps {
   children?: React.ReactNode;
+  collisionBoundaries?: THREE.Box3[];
 }
 
-export function MuseumSceneManager({ children }: MuseumSceneManagerProps) {
+export function MuseumSceneManager({ children, collisionBoundaries = [] }: MuseumSceneManagerProps) {
   const themeMode = useMuseumStore((state) => state.themeMode);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Detect if device is mobile
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768 || 'ontouchstart' in window);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
     <Canvas
@@ -46,6 +61,11 @@ export function MuseumSceneManager({ children }: MuseumSceneManagerProps) {
     >
       {/* Lighting based on theme */}
       <SceneLighting themeMode={themeMode} />
+
+      {/* Desktop navigation controls (WASD + mouse) */}
+      {!isMobile && collisionBoundaries.length > 0 && (
+        <DesktopControls collisionBoundaries={collisionBoundaries} enabled={true} />
+      )}
 
       {/* Children components (museum layout, frames, etc.) */}
       {children}
