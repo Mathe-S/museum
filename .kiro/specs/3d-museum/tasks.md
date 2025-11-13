@@ -95,7 +95,7 @@
   - Extract theme colors from generated images
   - _Requirements: 7.4, 7.5, 7.6, 9.3_
 
-- [ ] 9. Implement public tRPC router
+- [x] 9. Implement public tRPC router
 
   - Create public router at `/server/routers/public.ts`
   - Implement `public.getMuseumByShareToken` query for public museum access
