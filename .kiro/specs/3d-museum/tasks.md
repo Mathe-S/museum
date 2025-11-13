@@ -24,7 +24,7 @@
   - Store user profile picture URL from Google in database
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 3. Set up database schema and migrations
+- [x] 3. Set up database schema and migrations
 
   - Define Drizzle schema for users, museums, frames, and comments tables
   - Create initial migration using drizzle-kit generate
