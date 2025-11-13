@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import * as THREE from "three";
+import { FrameEntity } from "./FrameEntity";
 
 interface Frame {
   id: string;
@@ -278,14 +279,21 @@ function FramePositions({ frames }: { frames: Frame[] }) {
     return calculateFramePositions(frames);
   }, [frames]);
 
+  const handleFrameClick = (frameId: string) => {
+    // TODO: Open Frame Interaction Modal (will be implemented in task 16)
+    console.log("Frame clicked:", frameId);
+  };
+
   return (
     <>
       {framePositions.map((framePos) => (
-        <FramePlaceholder
+        <FrameEntity
           key={framePos.id}
+          id={framePos.id}
           position={framePos.position}
           rotation={framePos.rotation}
-          isEmpty={!framePos.imageUrl}
+          imageUrl={framePos.imageUrl}
+          onFrameClick={handleFrameClick}
         />
       ))}
     </>
@@ -351,26 +359,7 @@ export function calculateFramePositions(frames: Frame[]) {
   return positions;
 }
 
-// Frame placeholder component
-function FramePlaceholder({
-  position,
-  rotation,
-  isEmpty,
-}: {
-  position: THREE.Vector3;
-  rotation: THREE.Euler;
-  isEmpty: boolean;
-}) {
-  return (
-    <mesh position={position} rotation={rotation} castShadow>
-      <boxGeometry args={[2.5, 3, 0.2]} />
-      <meshStandardMaterial
-        color={isEmpty ? "#8b4513" : "#654321"}
-        roughness={0.8}
-      />
-    </mesh>
-  );
-}
+
 
 // Portal component
 function Portal({ position }: { position: THREE.Vector3 }) {

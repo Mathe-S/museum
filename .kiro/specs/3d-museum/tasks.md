@@ -139,7 +139,7 @@
   - Generate collision boundaries for walls
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 11.4_
 
-- [ ] 13. Build Frame Entity component
+- [x] 13. Build Frame Entity component
 
   - Create frame mesh with picture frame geometry
   - Implement texture loading system with lazy loading (load within 15 units)
