@@ -195,7 +195,7 @@
   - Implement optimistic updates for better UX
   - _Requirements: 6.4, 6.5, 6.6, 7.4, 7.5, 7.6, 8.5, 13.2_
 
-- [ ] 18. Build Profile Overlay component
+- [x] 18. Build Profile Overlay component
 
   - Create overlay UI with user profile picture from Google
   - Display current museum name

@@ -3,6 +3,7 @@
 import { MuseumSceneManager } from "@/components/museum/MuseumSceneManager";
 import { MuseumLayout } from "@/components/museum/MuseumLayout";
 import { FrameInteractionModal } from "@/components/museum/FrameInteractionModal";
+import { ProfileOverlay } from "@/components/museum/ProfileOverlay";
 import { useMuseumStore } from "@/lib/store/museum-store";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import * as THREE from "three";
@@ -14,6 +15,8 @@ export default function MuseumPage() {
   const setSelectedFrame = useMuseumStore((state) => state.setSelectedFrame);
   const frames = useMuseumStore((state) => state.frames);
   const setFrames = useMuseumStore((state) => state.setFrames);
+  const setShowProfileOverlay = useMuseumStore((state) => state.setShowProfileOverlay);
+  const showProfileOverlay = useMuseumStore((state) => state.showProfileOverlay);
   
   const [collisionBoundaries, setCollisionBoundaries] = useState<THREE.Box3[]>([]);
   const [isMobile, setIsMobile] = useState(false);
@@ -87,6 +90,11 @@ export default function MuseumPage() {
     setSelectedFrame(null);
   }, [setSelectedFrame]);
 
+  // Pause navigation when profile overlay or modal is open
+  useEffect(() => {
+    setIsNavigationPaused(showProfileOverlay || selectedFrame !== null);
+  }, [showProfileOverlay, selectedFrame]);
+
   return (
     <div className="relative h-screen w-screen">
       {/* 3D Scene */}
@@ -108,8 +116,14 @@ export default function MuseumPage() {
         onNavigationPause={setIsNavigationPaused}
       />
 
-      {/* UI Overlay - Theme Toggle */}
-      <div className="absolute top-4 right-4 z-10">
+      {/* UI Overlay - Top Right Controls */}
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <button
+          onClick={() => setShowProfileOverlay(true)}
+          className="px-4 py-2 bg-white/90 hover:bg-white text-black rounded-lg shadow-lg font-medium transition-colors"
+        >
+          👤 Profile
+        </button>
         <button
           onClick={toggleTheme}
           className="px-4 py-2 bg-white/90 hover:bg-white text-black rounded-lg shadow-lg font-medium transition-colors"
@@ -117,6 +131,9 @@ export default function MuseumPage() {
           {themeMode === "day" ? "🌙 Night Mode" : "☀️ Day Mode"}
         </button>
       </div>
+
+      {/* Profile Overlay */}
+      <ProfileOverlay />
 
       {/* Info overlay */}
       <div className="absolute bottom-4 left-4 z-10 bg-black/70 text-white px-4 py-3 rounded-lg max-w-md">
