@@ -1,6 +1,7 @@
 import { createTRPCRouter } from "./trpc";
 import { museumRouter } from "./routers/museum";
 import { frameRouter } from "./routers/frame";
+import { imageRouter } from "./routers/image";
 
 /**
  * Root tRPC router
@@ -9,6 +10,7 @@ import { frameRouter } from "./routers/frame";
 export const appRouter = createTRPCRouter({
   museum: museumRouter,
   frame: frameRouter,
+  image: imageRouter,
 });
 
 export type AppRouter = typeof appRouter;

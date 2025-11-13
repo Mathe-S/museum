@@ -71,12 +71,12 @@
   - Use protected procedure middleware for all routes
   - _Requirements: 4.5, 6.5, 8.4, 8.5, 13.2_
 
-- [ ] 7. Implement image tRPC router
+- [x] 7. Implement image tRPC router
 
   - Create image router at `/server/routers/image.ts`
   - Implement `image.upload` mutation for image uploads
   - Integrate Google Cloud Storage SDK for file storage
-  - Validate file type (JPEG, PNG, WebP) and size (max 10MB) with Zod
+  - Validate file type (JPEG, PNG, WebP) and size (max 3MB) with Zod
   - Generate unique filenames using cuid
   - Compress and optimize images to WebP format
   - Generate multiple sizes (thumbnail, medium, full) for performance
