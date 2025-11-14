@@ -11,9 +11,10 @@ interface MuseumSceneManagerProps {
   children?: React.ReactNode;
   collisionBoundaries?: THREE.Box3[];
   navigationEnabled?: boolean;
+  cameraPosition?: [number, number, number];
 }
 
-export function MuseumSceneManager({ children, collisionBoundaries = [], navigationEnabled = true }: MuseumSceneManagerProps) {
+export function MuseumSceneManager({ children, collisionBoundaries = [], navigationEnabled = true, cameraPosition = [0, 1.6, 5] }: MuseumSceneManagerProps) {
   const themeMode = useMuseumStore((state) => state.themeMode);
   const [isMobile, setIsMobile] = useState(false);
   const [joystickDirection, setJoystickDirection] = useState({ x: 0, y: 0 });
@@ -37,34 +38,41 @@ export function MuseumSceneManager({ children, collisionBoundaries = [], navigat
   return (
     <>
     <Canvas
+      key={cameraPosition.join(',')} // Force re-render when camera position changes
       camera={{
         fov: 75,
         near: 0.1,
         far: 1000,
-        position: [0, 1.6, 5],
+        position: cameraPosition,
       }}
       gl={{
         powerPreference: "high-performance",
         antialias: typeof window !== "undefined" && window.innerWidth > 768,
         alpha: false,
+        stencil: false, // Disable stencil buffer for performance
+        depth: true,
       }}
       dpr={
         typeof window !== "undefined"
           ? Math.min(window.devicePixelRatio, 2)
           : 1
       }
-      frameloop="always"
+      frameloop="always" // Always render for smooth controls
       onCreated={({ gl, scene, camera }) => {
         // Configure renderer for performance
         gl.setClearColor(0x000000);
         gl.shadowMap.enabled = true;
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
+        gl.shadowMap.autoUpdate = false; // Manual shadow updates for performance
+        
+        // Performance optimizations
+        gl.outputColorSpace = THREE.SRGBColorSpace;
 
         // Enable frustum culling (enabled by default in Three.js)
         camera.matrixAutoUpdate = true;
 
-        // Set scene fog for depth perception
-        scene.fog = new THREE.Fog(0x000000, 10, 100);
+        // Set scene fog for depth perception and performance (hides far objects)
+        scene.fog = new THREE.Fog(0x000000, 30, 120);
       }}
     >
       {/* Lighting based on theme */}

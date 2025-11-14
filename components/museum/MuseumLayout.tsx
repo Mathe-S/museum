@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import { FrameEntity } from "./FrameEntity";
+import { PortalSystem } from "./PortalSystem";
 
 interface Frame {
   id: string;
@@ -15,9 +16,11 @@ interface MuseumLayoutProps {
   frames: Frame[];
   onCollisionBoundariesReady?: (boundaries: THREE.Box3[]) => void;
   onFrameClick?: (frameId: string) => void;
+  onMuseumSwitch?: (museumId: string) => void;
+  onNavigationPause?: (paused: boolean) => void;
 }
 
-export function MuseumLayout({ frames, onCollisionBoundariesReady, onFrameClick }: MuseumLayoutProps) {
+export function MuseumLayout({ frames, onCollisionBoundariesReady, onFrameClick, onMuseumSwitch, onNavigationPause }: MuseumLayoutProps) {
   const { mainHallGeometry, extendableHallGeometry, collisionBoundaries } =
     useMemo(() => {
       const geometry = generateMuseumGeometry(frames);
@@ -39,8 +42,12 @@ export function MuseumLayout({ frames, onCollisionBoundariesReady, onFrameClick 
       {/* Frame Positions */}
       <FramePositions frames={frames} onFrameClick={onFrameClick} />
 
-      {/* Portal at end of Extendable Hall */}
-      <Portal position={extendableHallGeometry.portalPosition} />
+      {/* Portal System at end of Extendable Hall */}
+      <PortalSystem 
+        position={extendableHallGeometry.portalPosition} 
+        onMuseumSwitch={onMuseumSwitch}
+        onNavigationPause={onNavigationPause}
+      />
 
       {/* Collision Boundaries (invisible) */}
       <CollisionBoundaries boundaries={collisionBoundaries} />
@@ -50,10 +57,10 @@ export function MuseumLayout({ frames, onCollisionBoundariesReady, onFrameClick 
 
 // Generate museum geometry based on frame count
 function generateMuseumGeometry(frames: Frame[]) {
-  // Main Hall dimensions
-  const MAIN_HALL_WIDTH = 20;
-  const MAIN_HALL_DEPTH = 15;
-  const MAIN_HALL_HEIGHT = 8;
+  // Main Hall dimensions - MASSIVE hall
+  const MAIN_HALL_WIDTH = 40;
+  const MAIN_HALL_DEPTH = 30;
+  const MAIN_HALL_HEIGHT = 12;
   const WALL_THICKNESS = 0.5;
 
   // Extendable Hall dimensions
@@ -103,10 +110,27 @@ function generateCollisionBoundaries(
   const { width, depth, height, wallThickness } = mainHall;
 
   // Main Hall walls
-  // Back wall
+  // Front entrance wall
+  boundaries.push(
+    new THREE.Box3(
+      new THREE.Vector3(-width / 2, 0, 0),
+      new THREE.Vector3(width / 2, height, wallThickness)
+    )
+  );
+
+  // Back wall - split into two segments with opening in center
+  // Left segment of back wall
   boundaries.push(
     new THREE.Box3(
       new THREE.Vector3(-width / 2, 0, -depth - wallThickness),
+      new THREE.Vector3(-5, height, -depth)
+    )
+  );
+  
+  // Right segment of back wall
+  boundaries.push(
+    new THREE.Box3(
+      new THREE.Vector3(5, 0, -depth - wallThickness),
       new THREE.Vector3(width / 2, height, -depth)
     )
   );
@@ -178,9 +202,22 @@ function MainHall({ geometry }: { geometry: any }) {
       {/* Glass Pyramid Roof (Louvre style) */}
       <GlassPyramidRoof width={width} depth={depth} height={height} />
 
-      {/* Back wall */}
-      <mesh position={[0, height / 2, -depth]} receiveShadow castShadow>
+      {/* Front entrance wall */}
+      <mesh position={[0, height / 2, 0]} receiveShadow castShadow>
         <boxGeometry args={[width, height, wallThickness]} />
+        <meshStandardMaterial color="#e8e8e8" />
+      </mesh>
+
+      {/* Back wall with opening for corridor */}
+      {/* Left segment of back wall */}
+      <mesh position={[-width / 4 - 2.5, height / 2, -depth]} receiveShadow castShadow>
+        <boxGeometry args={[width / 2 - 5, height, wallThickness]} />
+        <meshStandardMaterial color="#e8e8e8" />
+      </mesh>
+      
+      {/* Right segment of back wall */}
+      <mesh position={[width / 4 + 2.5, height / 2, -depth]} receiveShadow castShadow>
+        <boxGeometry args={[width / 2 - 5, height, wallThickness]} />
         <meshStandardMaterial color="#e8e8e8" />
       </mesh>
 
@@ -195,6 +232,46 @@ function MainHall({ geometry }: { geometry: any }) {
         <boxGeometry args={[wallThickness, height, depth]} />
         <meshStandardMaterial color="#e8e8e8" />
       </mesh>
+
+      {/* Plant Decorations - Optimized */}
+      <PlantDecorations width={width} depth={depth} />
+    </group>
+  );
+}
+
+// Optimized Plant Decorations Component
+function PlantDecorations({ width, depth }: { width: number; depth: number }) {
+  // Shared geometries for performance (instancing)
+  const potGeometry = useMemo(() => new THREE.CylinderGeometry(0.8, 0.6, 1, 8), []);
+  const leafGeometry = useMemo(() => new THREE.SphereGeometry(1.2, 8, 8), []);
+  
+  // Plant positions - strategically placed to not block movement
+  const plantPositions = useMemo(() => [
+    // Front corners
+    { x: -width / 2 + 3, z: -2 },
+    { x: width / 2 - 3, z: -2 },
+    // Mid-left and mid-right
+    { x: -width / 2 + 3, z: -depth / 2 },
+    { x: width / 2 - 3, z: -depth / 2 },
+    // Back corners (near corridor entrance)
+    { x: -width / 2 + 3, z: -depth + 3 },
+    { x: width / 2 - 3, z: -depth + 3 },
+  ], [width, depth]);
+
+  return (
+    <group>
+      {plantPositions.map((pos, i) => (
+        <group key={i} position={[pos.x, 0, pos.z]}>
+          {/* Pot */}
+          <mesh geometry={potGeometry} position={[0, 0.5, 0]} castShadow>
+            <meshStandardMaterial color="#8B4513" roughness={0.8} />
+          </mesh>
+          {/* Plant leaves */}
+          <mesh geometry={leafGeometry} position={[0, 2, 0]} castShadow>
+            <meshStandardMaterial color="#2d5016" roughness={0.7} />
+          </mesh>
+        </group>
+      ))}
     </group>
   );
 }
@@ -358,7 +435,7 @@ function ExtendableHall({ geometry }: { geometry: any }) {
   return (
     <group>
       {Array.from({ length: segments }).map((_, i) => {
-        const zPosition = -15 - segmentLength / 2 - i * segmentLength;
+        const zPosition = -30 - segmentLength / 2 - i * segmentLength; // Start from back wall at -30
 
         return (
           <group key={i}>
@@ -407,7 +484,7 @@ function ExtendableHall({ geometry }: { geometry: any }) {
 
       {/* End wall */}
       <mesh
-        position={[0, height / 2, -15 - segmentLength * segments]}
+        position={[0, height / 2, -30 - segmentLength * segments]}
         receiveShadow
         castShadow
       >
@@ -449,25 +526,24 @@ export function calculateFramePositions(frames: Frame[]) {
     imageUrl: string | null;
   }> = [];
 
-  // Main Hall: Distribute 9 frames across 3 walls (back, left, right)
-  const MAIN_HALL_BACK_WALL_Z = -15;
-  const MAIN_HALL_WIDTH = 20;
-  const MAIN_HALL_DEPTH = 15;
-  const FRAME_HEIGHT = 3.5;
+  // Main Hall: Distribute 9 frames across 3 walls (front entrance, left, right)
+  const MAIN_HALL_WIDTH = 40;
+  const MAIN_HALL_DEPTH = 30;
+  const FRAME_HEIGHT = 5;
 
-  // Back wall: 3 frames (positions 0, 1, 2)
+  // Front entrance wall: 3 frames (positions 0, 1, 2)
   for (let i = 0; i < 3; i++) {
     const frame = frames.find((f) => f.position === i);
     if (!frame) continue;
 
-    const x = (i - 1) * 6; // Spacing of 6 units
+    const x = (i - 1) * 10; // Spacing of 10 units for larger hall
     const y = FRAME_HEIGHT;
-    const z = MAIN_HALL_BACK_WALL_Z + 0.3;
+    const z = -0.3; // Just in front of entrance wall
 
     positions.push({
       id: frame.id,
       position: new THREE.Vector3(x, y, z),
-      rotation: new THREE.Euler(0, 0, 0),
+      rotation: new THREE.Euler(0, Math.PI, 0), // Rotate 180 degrees to face inward
       imageUrl: frame.imageUrl,
     });
   }
@@ -480,7 +556,7 @@ export function calculateFramePositions(frames: Frame[]) {
     const wallIndex = i - 3;
     const x = -MAIN_HALL_WIDTH / 2 + 0.3;
     const y = FRAME_HEIGHT;
-    const z = -(wallIndex * 5 + 2.5); // Distribute along the wall
+    const z = -(wallIndex * 10 + 5); // Distribute along the larger wall
 
     positions.push({
       id: frame.id,
@@ -498,7 +574,7 @@ export function calculateFramePositions(frames: Frame[]) {
     const wallIndex = i - 6;
     const x = MAIN_HALL_WIDTH / 2 - 0.3;
     const y = FRAME_HEIGHT;
-    const z = -(wallIndex * 5 + 2.5); // Distribute along the wall
+    const z = -(wallIndex * 10 + 5); // Distribute along the larger wall
 
     positions.push({
       id: frame.id,
@@ -519,7 +595,7 @@ export function calculateFramePositions(frames: Frame[]) {
 
     const x = isLeft ? -HALL_WIDTH / 2 + 0.3 : HALL_WIDTH / 2 - 0.3;
     const y = 4;
-    const z = -15 - HALL_SEGMENT_LENGTH * (segmentIndex + 0.5);
+    const z = -MAIN_HALL_DEPTH - HALL_SEGMENT_LENGTH * (segmentIndex + 0.5);
 
     const rotationY = isLeft ? Math.PI / 2 : -Math.PI / 2;
 
@@ -536,21 +612,7 @@ export function calculateFramePositions(frames: Frame[]) {
 
 
 
-// Portal component
-function Portal({ position }: { position: THREE.Vector3 }) {
-  return (
-    <mesh position={position} castShadow>
-      <cylinderGeometry args={[1.5, 1.5, 3, 32]} />
-      <meshStandardMaterial
-        color="#4a90e2"
-        emissive="#2a5a9a"
-        emissiveIntensity={0.5}
-        transparent
-        opacity={0.7}
-      />
-    </mesh>
-  );
-}
+
 
 // Collision boundaries (invisible helper)
 function CollisionBoundaries({ boundaries }: { boundaries: THREE.Box3[] }) {

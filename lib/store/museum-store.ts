@@ -45,6 +45,7 @@ interface MuseumStore {
   showTutorial: boolean;
   themeMode: "day" | "night";
   moveSpeed: number;
+  shouldResetCamera: boolean;
 
   // Multiplayer state
   visitors: Map<string, Visitor>;
@@ -61,6 +62,7 @@ interface MuseumStore {
   setShowTutorial: (show: boolean) => void;
   setIsLoading: (loading: boolean) => void;
   setMoveSpeed: (speed: number) => void;
+  setShouldResetCamera: (reset: boolean) => void;
 
   // Multiplayer actions
   addVisitor: (visitor: Visitor) => void;
@@ -82,7 +84,8 @@ export const useMuseumStore = create<MuseumStore>((set) => ({
   showProfileOverlay: false,
   showTutorial: false,
   themeMode: "day",
-  moveSpeed: 5.0,
+  moveSpeed: 10.0, // Increased from 5.0 to 10.0 for faster movement
+  shouldResetCamera: false,
   visitors: new Map(),
   visitorCount: 0,
 
@@ -106,6 +109,7 @@ export const useMuseumStore = create<MuseumStore>((set) => ({
   setShowTutorial: (show) => set({ showTutorial: show }),
   setIsLoading: (loading) => set({ isLoading: loading }),
   setMoveSpeed: (speed) => set({ moveSpeed: speed }),
+  setShouldResetCamera: (reset) => set({ shouldResetCamera: reset }),
 
   // Multiplayer actions
   addVisitor: (visitor) =>

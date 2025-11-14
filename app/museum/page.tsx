@@ -4,7 +4,9 @@ import { MuseumSceneManager } from "@/components/museum/MuseumSceneManager";
 import { MuseumLayout } from "@/components/museum/MuseumLayout";
 import { FrameInteractionModal } from "@/components/museum/FrameInteractionModal";
 import { ProfileOverlay } from "@/components/museum/ProfileOverlay";
+import { MuseumSelectorUI } from "@/components/museum/MuseumSelectorUI";
 import { useMuseumStore } from "@/lib/store/museum-store";
+import { trpc } from "@/lib/trpc/client";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import * as THREE from "three";
 
@@ -17,10 +19,15 @@ export default function MuseumPage() {
   const setFrames = useMuseumStore((state) => state.setFrames);
   const setShowProfileOverlay = useMuseumStore((state) => state.setShowProfileOverlay);
   const showProfileOverlay = useMuseumStore((state) => state.showProfileOverlay);
+  const currentMuseum = useMuseumStore((state) => state.currentMuseum);
+  const setCurrentMuseum = useMuseumStore((state) => state.setCurrentMuseum);
   
   const [collisionBoundaries, setCollisionBoundaries] = useState<THREE.Box3[]>([]);
   const [isMobile, setIsMobile] = useState(false);
   const [isNavigationPaused, setIsNavigationPaused] = useState(false);
+  const [currentMuseumId, setCurrentMuseumId] = useState<string | null>(null);
+  const [cameraPosition, setCameraPosition] = useState<[number, number, number]>([0, 1.6, -15]); // Center of main hall
+  const [showMuseumSelector, setShowMuseumSelector] = useState(false);
 
   // Test data: Create frames for demonstration
   const testFrames = useMemo(() => {
@@ -92,8 +99,52 @@ export default function MuseumPage() {
 
   // Pause navigation when profile overlay or modal is open
   useEffect(() => {
-    setIsNavigationPaused(showProfileOverlay || selectedFrame !== null);
-  }, [showProfileOverlay, selectedFrame]);
+    setIsNavigationPaused(showProfileOverlay || selectedFrame !== null || showMuseumSelector);
+  }, [showProfileOverlay, selectedFrame, showMuseumSelector]);
+
+  // Listen for portal zone entered event
+  useEffect(() => {
+    const handlePortalZoneEntered = () => {
+      setShowMuseumSelector(true);
+    };
+
+    window.addEventListener('portalZoneEntered', handlePortalZoneEntered);
+    return () => {
+      window.removeEventListener('portalZoneEntered', handlePortalZoneEntered);
+    };
+  }, []);
+
+  // Handle museum switching
+  const handleMuseumSwitch = useCallback(async (museumId: string) => {
+    setCurrentMuseumId(museumId);
+    setShowMuseumSelector(false);
+    // Reset camera to center of main hall
+    setCameraPosition([0, 1.6, -15]);
+  }, []);
+
+  // Fetch museum data when switching
+  const { data: museumData } = trpc.museum.getById.useQuery(
+    { id: currentMuseumId! },
+    { enabled: !!currentMuseumId }
+  );
+
+  // Update store when museum data is loaded
+  useEffect(() => {
+    if (museumData) {
+      // Transform the data to match the store types
+      const museum = {
+        ...museumData,
+        themeMode: museumData.themeMode as "day" | "night",
+      };
+      const framesData = museumData.frames.map(frame => ({
+        ...frame,
+        themeColors: frame.themeColors as string[] | null,
+      }));
+      
+      setCurrentMuseum(museum);
+      setFrames(framesData);
+    }
+  }, [museumData, setCurrentMuseum, setFrames]);
 
   return (
     <div className="relative h-screen w-screen">
@@ -101,11 +152,14 @@ export default function MuseumPage() {
       <MuseumSceneManager 
         collisionBoundaries={collisionBoundaries}
         navigationEnabled={!isNavigationPaused}
+        cameraPosition={cameraPosition}
       >
         <MuseumLayout 
-          frames={testFrames} 
+          frames={currentMuseumId && museumData ? museumData.frames : testFrames} 
           onCollisionBoundariesReady={handleCollisionBoundariesReady}
           onFrameClick={handleFrameClick}
+          onMuseumSwitch={handleMuseumSwitch}
+          onNavigationPause={setIsNavigationPaused}
         />
       </MuseumSceneManager>
 
@@ -134,6 +188,14 @@ export default function MuseumPage() {
 
       {/* Profile Overlay */}
       <ProfileOverlay />
+
+      {/* Museum Selector UI */}
+      {showMuseumSelector && (
+        <MuseumSelectorUI
+          onClose={() => setShowMuseumSelector(false)}
+          onSelect={handleMuseumSwitch}
+        />
+      )}
 
       {/* Info overlay */}
       <div className="absolute bottom-4 left-4 z-10 bg-black/70 text-white px-4 py-3 rounded-lg max-w-md">
