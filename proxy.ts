@@ -7,7 +7,8 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/api/auth/callback",
   "/api/public/(.*)",
-  "/museum/(.*)",
+  "/api/trpc/public.(.*)", // Public tRPC endpoints
+  "/museum/(.*)", // Public museum pages
   "/frame/(.*)",
 ]);
 

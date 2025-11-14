@@ -176,7 +176,7 @@ export function ProfileOverlay() {
         ...museum,
         themeMode: museum.themeMode as "day" | "night",
       });
-      setShowProfileOverlay(false);
+      // Don't close the overlay - let user continue managing museums
     }
   };
 
@@ -294,9 +294,29 @@ export function ProfileOverlay() {
               Current Museum
             </h3>
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="font-medium text-gray-900 mb-3">
-                {currentMuseum.name}
-              </p>
+              {/* Museum Name - Editable */}
+              <div className="mb-3">
+                <label className="block text-xs text-gray-600 mb-1">Museum Name</label>
+                <input
+                  type="text"
+                  value={currentMuseum.name}
+                  onChange={(e) => {
+                    // Update locally first for instant feedback
+                    setCurrentMuseum({ ...currentMuseum, name: e.target.value });
+                  }}
+                  onBlur={(e) => {
+                    // Save to database on blur
+                    if (e.target.value.trim() && e.target.value !== currentMuseum.name) {
+                      updateMuseum.mutate({
+                        id: currentMuseum.id,
+                        name: e.target.value.trim(),
+                      });
+                    }
+                  }}
+                  maxLength={100}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-medium text-gray-900"
+                />
+              </div>
 
               {/* Public/Private Toggle */}
               <div className="flex items-center justify-between mb-3">

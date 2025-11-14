@@ -5,17 +5,17 @@ import { MuseumLayout } from "@/components/museum/MuseumLayout";
 import { FrameInteractionModal } from "@/components/museum/FrameInteractionModal";
 import { useMuseumStore } from "@/lib/store/museum-store";
 import { trpc } from "@/lib/trpc/client";
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { use, useState, useCallback, useEffect } from "react";
 import * as THREE from "three";
 
 interface PublicMuseumPageProps {
-  params: {
+  params: Promise<{
     shareToken: string;
-  };
+  }>;
 }
 
 export default function PublicMuseumPage({ params }: PublicMuseumPageProps) {
-  const { shareToken } = params;
+  const { shareToken } = use(params);
   
   const themeMode = useMuseumStore((state) => state.themeMode);
   const toggleTheme = useMuseumStore((state) => state.toggleTheme);

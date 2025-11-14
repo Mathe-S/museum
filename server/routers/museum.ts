@@ -7,6 +7,55 @@ import { db } from "@/lib/db";
 import { museums, frames, users } from "@/lib/db/schema";
 
 /**
+ * Helper function to ensure user exists in database
+ * Creates user and default museum if they don't exist
+ */
+async function ensureUserExists(clerkId: string, email?: string) {
+  let user = await db.query.users.findFirst({
+    where: eq(users.clerkId, clerkId),
+  });
+
+  if (!user) {
+    // Create user
+    [user] = await db
+      .insert(users)
+      .values({
+        clerkId,
+        email: email || `${clerkId}@temp.com`, // Fallback email
+      })
+      .returning();
+
+    // Create default museum for new user
+    const [museum] = await db
+      .insert(museums)
+      .values({
+        userId: user.id,
+        name: "My Museum",
+        themeMode: "day",
+      })
+      .returning();
+
+    // Create 9 frames for Main Hall (positions 0-8)
+    const mainHallFrames = Array.from({ length: 9 }, (_, i) => ({
+      museumId: museum.id,
+      position: i,
+      side: null,
+    }));
+
+    // Create 1 frame for Extendable Hall (position 9, left side)
+    const extendableHallFrame = {
+      museumId: museum.id,
+      position: 9,
+      side: "left",
+    };
+
+    await db.insert(frames).values([...mainHallFrames, extendableHallFrame]);
+  }
+
+  return user;
+}
+
+/**
  * Museum router - handles museum CRUD operations
  * All routes require authentication
  */
@@ -15,17 +64,8 @@ export const museumRouter = createTRPCRouter({
    * List all museums for the authenticated user
    */
   list: protectedProcedure.query(async ({ ctx }) => {
-    // First, ensure user exists in database
-    const user = await db.query.users.findFirst({
-      where: eq(users.clerkId, ctx.userId),
-    });
-
-    if (!user) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "User not found in database",
-      });
-    }
+    // Ensure user exists in database (creates user + default museum if needed)
+    const user = await ensureUserExists(ctx.userId, ctx.userEmail);
 
     const userMuseums = await db.query.museums.findMany({
       where: eq(museums.userId, user.id),
@@ -47,17 +87,8 @@ export const museumRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // First, ensure user exists in database
-      const user = await db.query.users.findFirst({
-        where: eq(users.clerkId, ctx.userId),
-      });
-
-      if (!user) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found in database",
-        });
-      }
+      // Ensure user exists in database
+      const user = await ensureUserExists(ctx.userId, ctx.userEmail);
 
       // Create museum
       const [museum] = await db
@@ -98,17 +129,8 @@ export const museumRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      // First, ensure user exists in database
-      const user = await db.query.users.findFirst({
-        where: eq(users.clerkId, ctx.userId),
-      });
-
-      if (!user) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found in database",
-        });
-      }
+      // Ensure user exists in database
+      const user = await ensureUserExists(ctx.userId, ctx.userEmail);
 
       const museum = await db.query.museums.findFirst({
         where: and(eq(museums.id, input.id), eq(museums.userId, user.id)),
@@ -142,17 +164,8 @@ export const museumRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // First, ensure user exists in database
-      const user = await db.query.users.findFirst({
-        where: eq(users.clerkId, ctx.userId),
-      });
-
-      if (!user) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found in database",
-        });
-      }
+      // Ensure user exists in database
+      const user = await ensureUserExists(ctx.userId, ctx.userEmail);
 
       // Verify ownership
       const museum = await db.query.museums.findFirst({
@@ -205,17 +218,8 @@ export const museumRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // First, ensure user exists in database
-      const user = await db.query.users.findFirst({
-        where: eq(users.clerkId, ctx.userId),
-      });
-
-      if (!user) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found in database",
-        });
-      }
+      // Ensure user exists in database
+      const user = await ensureUserExists(ctx.userId, ctx.userEmail);
 
       // Verify ownership
       const museum = await db.query.museums.findFirst({
@@ -245,17 +249,8 @@ export const museumRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // First, ensure user exists in database
-      const user = await db.query.users.findFirst({
-        where: eq(users.clerkId, ctx.userId),
-      });
-
-      if (!user) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found in database",
-        });
-      }
+      // Ensure user exists in database
+      const user = await ensureUserExists(ctx.userId, ctx.userEmail);
 
       // Verify ownership
       const museum = await db.query.museums.findFirst({

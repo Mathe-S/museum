@@ -8,9 +8,13 @@ import { ZodError } from "zod";
  */
 export async function createTRPCContext() {
   const authResult = await auth();
+  
+  // Get user email from session claims if available
+  const userEmail = authResult.sessionClaims?.email as string | undefined;
 
   return {
     userId: authResult.userId,
+    userEmail,
     auth: authResult,
   };
 }
