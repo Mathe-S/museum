@@ -141,16 +141,16 @@ function generateCollisionBoundaries(
   // Left wall
   boundaries.push(
     new THREE.Box3(
-      new THREE.Vector3(-width / 2 - wallThickness, 0, 0),
-      new THREE.Vector3(-width / 2, height, -depth)
+      new THREE.Vector3(-width / 2 - wallThickness, 0, -depth),
+      new THREE.Vector3(-width / 2, height, 0)
     )
   );
 
   // Right wall
   boundaries.push(
     new THREE.Box3(
-      new THREE.Vector3(width / 2, 0, 0),
-      new THREE.Vector3(width / 2 + wallThickness, height, -depth)
+      new THREE.Vector3(width / 2, 0, -depth),
+      new THREE.Vector3(width / 2 + wallThickness, height, 0)
     )
   );
 
@@ -248,17 +248,14 @@ function PlantDecorations({ width, depth }: { width: number; depth: number }) {
   const potGeometry = useMemo(() => new THREE.CylinderGeometry(0.8, 0.6, 1, 8), []);
   const leafGeometry = useMemo(() => new THREE.SphereGeometry(1.2, 8, 8), []);
   
-  // Plant positions - strategically placed to not block movement
+  // Plant positions - strategically placed to not block movement or frame views
   const plantPositions = useMemo(() => [
-    // Front corners
-    { x: -width / 2 + 3, z: -2 },
-    { x: width / 2 - 3, z: -2 },
-    // Mid-left and mid-right
-    { x: -width / 2 + 3, z: -depth / 2 },
-    { x: width / 2 - 3, z: -depth / 2 },
-    // Back corners (near corridor entrance)
-    { x: -width / 2 + 3, z: -depth + 3 },
-    { x: width / 2 - 3, z: -depth + 3 },
+    // Front corners - further from walls
+    { x: -width / 2 + 5, z: -3 },
+    { x: width / 2 - 5, z: -3 },
+    // Back corners (near corridor entrance) - further from walls
+    { x: -width / 2 + 5, z: -depth + 5 },
+    { x: width / 2 - 5, z: -depth + 5 },
   ], [width, depth]);
 
   return (

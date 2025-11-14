@@ -18,17 +18,25 @@ export default function MuseumPage() {
   const setSelectedFrame = useMuseumStore((state) => state.setSelectedFrame);
   const frames = useMuseumStore((state) => state.frames);
   const setFrames = useMuseumStore((state) => state.setFrames);
-  const setShowProfileOverlay = useMuseumStore((state) => state.setShowProfileOverlay);
-  const showProfileOverlay = useMuseumStore((state) => state.showProfileOverlay);
+  const setShowProfileOverlay = useMuseumStore(
+    (state) => state.setShowProfileOverlay
+  );
+  const showProfileOverlay = useMuseumStore(
+    (state) => state.showProfileOverlay
+  );
   const setCurrentMuseum = useMuseumStore((state) => state.setCurrentMuseum);
   const showTutorial = useMuseumStore((state) => state.showTutorial);
   const setShowTutorial = useMuseumStore((state) => state.setShowTutorial);
-  
-  const [collisionBoundaries, setCollisionBoundaries] = useState<THREE.Box3[]>([]);
+
+  const [collisionBoundaries, setCollisionBoundaries] = useState<THREE.Box3[]>(
+    []
+  );
   const [isMobile, setIsMobile] = useState(false);
   const [isNavigationPaused, setIsNavigationPaused] = useState(false);
   const [currentMuseumId, setCurrentMuseumId] = useState<string | null>(null);
-  const [cameraPosition, setCameraPosition] = useState<[number, number, number]>([0, 1.6, -15]); // Center of main hall
+  const [cameraPosition, setCameraPosition] = useState<
+    [number, number, number]
+  >([0, 1.6, -15]); // Center of main hall
   const [showMuseumSelector, setShowMuseumSelector] = useState(false);
 
   // Fetch user profile to check tutorial dismissal status
@@ -37,7 +45,7 @@ export default function MuseumPage() {
   // Test data: Create frames for demonstration
   const testFrames = useMemo(() => {
     const framesList = [];
-    
+
     // Main Hall: 9 frames (positions 0-8)
     for (let i = 0; i < 9; i++) {
       framesList.push({
@@ -53,7 +61,7 @@ export default function MuseumPage() {
         updatedAt: new Date(),
       });
     }
-    
+
     // Extendable Hall: 6 frames (positions 9-14) alternating left-right
     for (let i = 9; i < 15; i++) {
       framesList.push({
@@ -69,28 +77,28 @@ export default function MuseumPage() {
         updatedAt: new Date(),
       });
     }
-    
+
     return framesList;
   }, []);
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768 || 'ontouchstart' in window);
+      setIsMobile(window.innerWidth <= 768 || "ontouchstart" in window);
     };
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   // Check if tutorial should be shown
   useEffect(() => {
     // Check localStorage first for instant feedback
     const localDismissed = localStorage.getItem("tutorialDismissed") === "true";
-    
+
     // If user profile is loaded, use database value as source of truth
     if (userProfile) {
       const dbDismissed = userProfile.tutorialDismissed;
-      
+
       // Show tutorial only if not dismissed in both localStorage and database
       if (!localDismissed && !dbDismissed) {
         setShowTutorial(true);
@@ -112,16 +120,22 @@ export default function MuseumPage() {
     setFrames(testFrames);
   }, [testFrames, setFrames]);
 
-  const handleCollisionBoundariesReady = useCallback((boundaries: THREE.Box3[]) => {
-    setCollisionBoundaries(boundaries);
-  }, []);
+  const handleCollisionBoundariesReady = useCallback(
+    (boundaries: THREE.Box3[]) => {
+      setCollisionBoundaries(boundaries);
+    },
+    []
+  );
 
-  const handleFrameClick = useCallback((frameId: string) => {
-    const frame = frames.find((f) => f.id === frameId);
-    if (frame) {
-      setSelectedFrame(frame);
-    }
-  }, [frames, setSelectedFrame]);
+  const handleFrameClick = useCallback(
+    (frameId: string) => {
+      const frame = frames.find((f) => f.id === frameId);
+      if (frame) {
+        setSelectedFrame(frame);
+      }
+    },
+    [frames, setSelectedFrame]
+  );
 
   const handleModalClose = useCallback(() => {
     setSelectedFrame(null);
@@ -133,7 +147,12 @@ export default function MuseumPage() {
 
   // Pause navigation when profile overlay, modal, or tutorial is open
   useEffect(() => {
-    setIsNavigationPaused(showProfileOverlay || selectedFrame !== null || showMuseumSelector || showTutorial);
+    setIsNavigationPaused(
+      showProfileOverlay ||
+        selectedFrame !== null ||
+        showMuseumSelector ||
+        showTutorial
+    );
   }, [showProfileOverlay, selectedFrame, showMuseumSelector, showTutorial]);
 
   // Listen for portal zone entered event
@@ -142,9 +161,9 @@ export default function MuseumPage() {
       setShowMuseumSelector(true);
     };
 
-    window.addEventListener('portalZoneEntered', handlePortalZoneEntered);
+    window.addEventListener("portalZoneEntered", handlePortalZoneEntered);
     return () => {
-      window.removeEventListener('portalZoneEntered', handlePortalZoneEntered);
+      window.removeEventListener("portalZoneEntered", handlePortalZoneEntered);
     };
   }, []);
 
@@ -170,11 +189,11 @@ export default function MuseumPage() {
         ...museumData,
         themeMode: museumData.themeMode as "day" | "night",
       };
-      const framesData = museumData.frames.map(frame => ({
+      const framesData = museumData.frames.map((frame) => ({
         ...frame,
         themeColors: frame.themeColors as string[] | null,
       }));
-      
+
       setCurrentMuseum(museum);
       setFrames(framesData);
     }
@@ -183,19 +202,33 @@ export default function MuseumPage() {
   return (
     <div className="relative h-screen w-screen">
       {/* 3D Scene */}
-      <MuseumSceneManager 
+      <MuseumSceneManager
         collisionBoundaries={collisionBoundaries}
         navigationEnabled={!isNavigationPaused}
         cameraPosition={cameraPosition}
       >
-        <MuseumLayout 
-          frames={currentMuseumId && museumData ? museumData.frames : testFrames} 
+        <MuseumLayout
+          frames={
+            currentMuseumId && museumData ? museumData.frames : testFrames
+          }
           onCollisionBoundariesReady={handleCollisionBoundariesReady}
           onFrameClick={handleFrameClick}
           onMuseumSwitch={handleMuseumSwitch}
           onNavigationPause={setIsNavigationPaused}
         />
       </MuseumSceneManager>
+
+      {/* Center Crosshair - Always visible to show aim point */}
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
+        <div className="relative">
+          {/* Horizontal line */}
+          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/60 transform -translate-y-1/2"></div>
+          {/* Vertical line */}
+          <div className="absolute left-1/2 top-0 w-0.5 h-full bg-white/60 transform -translate-x-1/2"></div>
+          {/* Center dot */}
+          <div className="absolute top-1/2 left-1/2 w-1 h-1 bg-white rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
+        </div>
+      </div>
 
       {/* Frame Interaction Modal */}
       <FrameInteractionModal
@@ -241,16 +274,17 @@ export default function MuseumPage() {
           Current theme: <span className="font-semibold">{themeMode}</span>
         </p>
         <p className="text-xs opacity-75 mt-2">
-          Main Hall: 9 frames in 3x3 grid | Extendable Hall: 6 frames alternating left-right | Portal at end
+          Main Hall: 9 frames in 3x3 grid | Extendable Hall: 6 frames
+          alternating left-right | Portal at end
         </p>
         <p className="text-xs opacity-75 mt-1">
-          {isMobile 
+          {isMobile
             ? "Use the joystick to move and drag the screen to look around."
-            : "Click to lock pointer, then use WASD to move and mouse to look around. Press ESC to unlock."
-          }
+            : "Click to lock pointer, then use WASD to move and mouse to look around. Press ESC to unlock."}
         </p>
         <p className="text-xs opacity-75 mt-1">
-          Click on frames to interact with them. Navigation is {isNavigationPaused ? "paused" : "active"}.
+          Click on frames to interact with them. Navigation is{" "}
+          {isNavigationPaused ? "paused" : "active"}.
         </p>
       </div>
     </div>

@@ -447,46 +447,28 @@ export function FrameInteractionModal({
               <p className="text-gray-600">This frame is empty.</p>
             </div>
           ) : isEmpty ? (
-            // Empty frame state
+            // Empty frame state - Unified interface
             <div className="space-y-4">
-              {/* Tabs */}
-              <div className="flex border-b border-gray-200">
-                <button
-                  onClick={() => {
-                    setActiveTab("upload");
-                    stopCamera();
+              {/* Image Source Selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Choose Image Source
+                </label>
+                <select
+                  value={activeTab}
+                  onChange={(e) => {
+                    const newTab = e.target.value as ModalTab;
+                    setActiveTab(newTab);
+                    if (newTab !== "camera") {
+                      stopCamera();
+                    }
                   }}
-                  className={`px-4 py-2 font-medium ${
-                    activeTab === "upload"
-                      ? "border-b-2 border-blue-500 text-blue-600"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  Upload
-                </button>
-                <button
-                  onClick={() => setActiveTab("camera")}
-                  className={`px-4 py-2 font-medium ${
-                    activeTab === "camera"
-                      ? "border-b-2 border-blue-500 text-blue-600"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  Camera
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab("generate");
-                    stopCamera();
-                  }}
-                  className={`px-4 py-2 font-medium ${
-                    activeTab === "generate"
-                      ? "border-b-2 border-blue-500 text-blue-600"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  AI Generate
-                </button>
+                  <option value="upload">📁 Upload from Device</option>
+                  <option value="camera">📷 Take Photo with Camera</option>
+                  <option value="generate">🎨 Generate with AI</option>
+                </select>
               </div>
 
               {/* Upload tab */}

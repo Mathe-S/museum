@@ -21,7 +21,7 @@ export function FrameEntity({
 }: FrameEntityProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
-  const [isHovered, setIsHovered] = useState(false);
+  const [isHovered, setIsHovered] = useState(false); // Crosshair on frame
   const [shouldLoadTexture, setShouldLoadTexture] = useState(false);
   const { camera } = useThree();
 
@@ -40,52 +40,66 @@ export function FrameEntity({
     if (distance > 30 && shouldLoadTexture) {
       setShouldLoadTexture(false);
     }
-
-    // Remove hover indicator when camera moves away (< 100ms handled by state)
-    if (distance > 5 && isHovered) {
-      setIsHovered(false);
-    }
   });
 
-  // Raycasting for hover detection
-  useFrame(({ raycaster }) => {
+  // Raycasting for crosshair detection (center of screen) - works at any distance
+  useFrame(({ camera }) => {
     if (!meshRef.current) return;
 
-    // Simple raycasting check
-    const intersects = raycaster.intersectObject(meshRef.current);
-    const shouldHover = intersects.length > 0;
+    // Check center of screen with small area
+    const centerPoints = [
+      new THREE.Vector2(0, 0),
+      new THREE.Vector2(0.1, 0),
+      new THREE.Vector2(-0.1, 0),
+      new THREE.Vector2(0, 0.1),
+      new THREE.Vector2(0, -0.1),
+    ];
+
+    let shouldHover = false;
+    
+    for (const point of centerPoints) {
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(point, camera);
+      const intersects = raycaster.intersectObject(meshRef.current);
+      
+      if (intersects.length > 0) {
+        shouldHover = true;
+        break;
+      }
+    }
 
     if (shouldHover !== isHovered) {
       setIsHovered(shouldHover);
     }
   });
 
-  const handleClick = () => {
-    if (onFrameClick) {
-      onFrameClick(id);
-    }
-  };
+  // Listen for custom frameClick event from center-screen raycasting
+  useEffect(() => {
+    const handleFrameClick = (event: Event) => {
+      const frameId = (event as any).frameId;
+      if (frameId === id && onFrameClick) {
+        onFrameClick(id);
+      }
+    };
+
+    window.addEventListener('frameClick', handleFrameClick);
+    return () => window.removeEventListener('frameClick', handleFrameClick);
+  }, [id, onFrameClick]);
+
+
 
   return (
     <group ref={groupRef} position={position} rotation={rotation}>
       {/* Frame mesh with picture frame geometry */}
       <FrameMesh
         ref={meshRef}
+        frameId={id}
         imageUrl={imageUrl}
         shouldLoadTexture={shouldLoadTexture}
-        onClick={handleClick}
       />
 
-      {/* Hover indicators */}
-      {isHovered && (
-        <>
-          {!imageUrl ? (
-            <CircleIndicator />
-          ) : (
-            <HighlightIndicator />
-          )}
-        </>
-      )}
+      {/* Circle indicator when crosshair is on frame */}
+      {isHovered && <CircleIndicator />}
     </group>
   );
 }
@@ -94,11 +108,11 @@ export function FrameEntity({
 const FrameMesh = React.forwardRef<
   THREE.Mesh,
   {
+    frameId: string;
     imageUrl: string | null;
     shouldLoadTexture: boolean;
-    onClick: () => void;
   }
->(({ imageUrl, shouldLoadTexture, onClick }, ref) => {
+>(({ frameId, imageUrl, shouldLoadTexture }, ref) => {
   const { camera } = useThree();
   const [currentLOD, setCurrentLOD] = useState<"high" | "low">("high");
 
@@ -117,7 +131,12 @@ const FrameMesh = React.forwardRef<
   return (
     <>
       {/* Picture frame border - Made bigger */}
-      <mesh onClick={onClick} ref={ref} castShadow receiveShadow>
+      <mesh 
+        ref={ref} 
+        castShadow 
+        receiveShadow
+        userData={{ frameId }}
+      >
         <boxGeometry args={[4.2, 5.0, 0.2]} />
         <meshStandardMaterial
           color="#8b4513"
@@ -127,7 +146,10 @@ const FrameMesh = React.forwardRef<
       </mesh>
 
       {/* Inner frame (where image goes) - Made bigger */}
-      <mesh position={[0, 0, 0.11]} onClick={onClick}>
+      <mesh 
+        position={[0, 0, 0.11]}
+        userData={{ frameId }}
+      >
         <boxGeometry args={[3.8, 4.5, 0.05]} />
         {imageUrl && shouldLoadTexture ? (
           <ImageMaterial
@@ -237,28 +259,6 @@ function CircleIndicator() {
         color="#ffffff"
         transparent
         opacity={0.8}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
-  );
-}
-
-// Highlight indicator for filled frames
-function HighlightIndicator() {
-  const [opacity, setOpacity] = useState(0.3);
-
-  // Pulsing animation
-  useFrame(({ clock }) => {
-    setOpacity(0.3 + Math.sin(clock.getElapsedTime() * 3) * 0.2);
-  });
-
-  return (
-    <mesh position={[0, 0, 0.2]}>
-      <planeGeometry args={[3.9, 4.6]} />
-      <meshBasicMaterial
-        color="#4a90e2"
-        transparent
-        opacity={opacity}
         side={THREE.DoubleSide}
       />
     </mesh>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { useMuseumStore } from "@/lib/store/museum-store";
 import { useEffect, useState, useCallback } from "react";
 import * as THREE from "three";
@@ -77,6 +77,9 @@ export function MuseumSceneManager({ children, collisionBoundaries = [], navigat
     >
       {/* Lighting based on theme */}
       <SceneLighting themeMode={themeMode} />
+
+      {/* Center-screen click handler for pointer lock mode */}
+      <CenterClickHandler />
 
       {/* Desktop navigation controls (WASD + mouse) */}
       {!isMobile && collisionBoundaries.length > 0 && (
@@ -169,4 +172,47 @@ function SceneLighting({ themeMode }: SceneLightingProps) {
       />
     </>
   );
+}
+
+// Component to handle clicks from center of screen when pointer is locked
+function CenterClickHandler() {
+  const { camera, scene, gl } = useThree();
+
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      // Only handle clicks when pointer is locked
+      if (document.pointerLockElement !== gl.domElement) {
+        return;
+      }
+
+      // Raycast from center of screen
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+      // Get all intersectable objects (frames)
+      const intersects = raycaster.intersectObjects(scene.children, true);
+
+      // Find the first frame mesh that was hit
+      for (const intersect of intersects) {
+        const object = intersect.object;
+        
+        // Check if this is a frame mesh (has userData with frameId)
+        if (object.userData && object.userData.frameId) {
+          // Trigger click event on the frame
+          const clickEvent = new Event('frameClick');
+          (clickEvent as any).frameId = object.userData.frameId;
+          window.dispatchEvent(clickEvent);
+          break;
+        }
+      }
+    };
+
+    gl.domElement.addEventListener('click', handleClick);
+
+    return () => {
+      gl.domElement.removeEventListener('click', handleClick);
+    };
+  }, [camera, scene, gl]);
+
+  return null;
 }

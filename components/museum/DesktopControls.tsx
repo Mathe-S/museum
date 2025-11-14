@@ -88,7 +88,7 @@ export function DesktopControls({
     // We need to add to the existing rotation from mouse movement
     if (keysPressed.current["KeyA"]) {
       yawRef.current += ROTATION_SPEED * delta;
-      
+
       // Apply additional yaw rotation to the camera
       const euler = new THREE.Euler(0, 0, 0, "YXZ");
       euler.setFromQuaternion(camera.quaternion);
@@ -97,7 +97,7 @@ export function DesktopControls({
     }
     if (keysPressed.current["KeyD"]) {
       yawRef.current -= ROTATION_SPEED * delta;
-      
+
       // Apply additional yaw rotation to the camera
       const euler = new THREE.Euler(0, 0, 0, "YXZ");
       euler.setFromQuaternion(camera.quaternion);
