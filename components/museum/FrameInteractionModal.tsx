@@ -9,6 +9,7 @@ interface FrameInteractionModalProps {
   frame: Frame | null;
   onClose: () => void;
   onNavigationPause?: (paused: boolean) => void;
+  isPublicView?: boolean;
 }
 
 type ModalTab = "upload" | "camera" | "generate" | "details";
@@ -17,6 +18,7 @@ export function FrameInteractionModal({
   frame,
   onClose,
   onNavigationPause,
+  isPublicView = false,
 }: FrameInteractionModalProps) {
   const [activeTab, setActiveTab] = useState<ModalTab>("upload");
   const [aiPrompt, setAiPrompt] = useState("");
@@ -33,9 +35,9 @@ export function FrameInteractionModal({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   const updateFrame = useMuseumStore((state) => state.updateFrame);
-  const deleteFrameFromStore = useMuseumStore((state) => state.deleteFrame);
 
   const utils = trpc.useUtils();
 
@@ -82,6 +84,38 @@ export function FrameInteractionModal({
       setDescription(frame.description);
     }
   }, [frame]);
+
+  // Effect to handle video stream setup
+  useEffect(() => {
+    if (stream && videoRef.current && isCameraActive) {
+      const video = videoRef.current;
+      video.srcObject = stream;
+      
+      const handleLoadedMetadata = async () => {
+        try {
+          await video.play();
+          setIsVideoReady(true);
+        } catch (err) {
+          console.error("Error playing video:", err);
+          setError("Failed to start video playback.");
+        }
+      };
+
+      const handleCanPlay = () => {
+        setIsVideoReady(true);
+      };
+
+      video.addEventListener('loadedmetadata', handleLoadedMetadata);
+      video.addEventListener('canplay', handleCanPlay);
+      
+      return () => {
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        video.removeEventListener('canplay', handleCanPlay);
+      };
+    } else {
+      setIsVideoReady(false);
+    }
+  }, [stream, isCameraActive]);
 
   const handleClose = () => {
     if (stream) {
@@ -178,12 +212,13 @@ export function FrameInteractionModal({
   const startCamera = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { 
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
       });
       setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
       setIsCameraActive(true);
       setError(null);
     } catch (err) {
@@ -193,12 +228,25 @@ export function FrameInteractionModal({
   };
 
   const capturePhoto = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) {
+      setError("Camera not ready. Please try again.");
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    
+    // Check if video is actually playing and has dimensions
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      setError("Camera not ready. Please wait a moment and try again.");
+      return;
+    }
+
     const context = canvas.getContext("2d");
-    if (!context) return;
+    if (!context) {
+      setError("Failed to initialize canvas.");
+      return;
+    }
 
     // Set canvas dimensions to match video
     canvas.width = video.videoWidth;
@@ -393,7 +441,12 @@ export function FrameInteractionModal({
             </div>
           )}
 
-          {isEmpty ? (
+          {isPublicView && isEmpty ? (
+            // Empty frame in public view - show message
+            <div className="text-center py-8">
+              <p className="text-gray-600">This frame is empty.</p>
+            </div>
+          ) : isEmpty ? (
             // Empty frame state
             <div className="space-y-4">
               {/* Tabs */}
@@ -487,22 +540,32 @@ export function FrameInteractionModal({
                     </button>
                   ) : (
                     <div className="space-y-4">
-                      <div className="relative bg-black rounded-lg overflow-hidden">
+                      <div className="relative bg-black rounded-lg overflow-hidden" style={{ minHeight: '300px' }}>
+                        {!isVideoReady && (
+                          <div className="absolute inset-0 flex items-center justify-center text-white">
+                            <div className="text-center">
+                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-2"></div>
+                              <p>Loading camera...</p>
+                            </div>
+                          </div>
+                        )}
                         <video
                           ref={videoRef}
                           autoPlay
                           playsInline
-                          className="w-full"
+                          muted
+                          className="w-full h-full object-cover"
+                          style={{ minHeight: '300px' }}
                         />
                       </div>
                       <canvas ref={canvasRef} className="hidden" />
                       <div className="flex gap-2">
                         <button
                           onClick={capturePhoto}
-                          disabled={isUploading}
+                          disabled={isUploading || !isVideoReady}
                           className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
                         >
-                          {isUploading ? "Processing..." : "Capture Photo"}
+                          {isUploading ? "Processing..." : isVideoReady ? "Capture Photo" : "Waiting for camera..."}
                         </button>
                         <button
                           onClick={stopCamera}
@@ -635,23 +698,34 @@ export function FrameInteractionModal({
                 </div>
               )}
 
-              {/* Action buttons */}
-              <div className="flex gap-2 pt-4">
-                <button
-                  onClick={handleShare}
-                  disabled={generateShareLinkMutation.isPending}
-                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
-                >
-                  {generateShareLinkMutation.isPending ? "Generating..." : "Share"}
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleteFrameMutation.isPending}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
-                >
-                  {deleteFrameMutation.isPending ? "Deleting..." : "Delete"}
-                </button>
-              </div>
+              {/* Action buttons - hide for public view */}
+              {!isPublicView && (
+                <div className="flex gap-2 pt-4">
+                  <button
+                    onClick={handleShare}
+                    disabled={generateShareLinkMutation.isPending}
+                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+                  >
+                    {generateShareLinkMutation.isPending ? "Generating..." : "Share"}
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleteFrameMutation.isPending}
+                    className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+                  >
+                    {deleteFrameMutation.isPending ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              )}
+              
+              {/* View-only message for public view */}
+              {isPublicView && (
+                <div className="pt-4 text-center">
+                  <p className="text-sm text-gray-500">
+                    👁️ Viewing as guest - editing disabled
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

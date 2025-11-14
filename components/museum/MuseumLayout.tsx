@@ -18,9 +18,10 @@ interface MuseumLayoutProps {
   onFrameClick?: (frameId: string) => void;
   onMuseumSwitch?: (museumId: string) => void;
   onNavigationPause?: (paused: boolean) => void;
+  isPublicView?: boolean;
 }
 
-export function MuseumLayout({ frames, onCollisionBoundariesReady, onFrameClick, onMuseumSwitch, onNavigationPause }: MuseumLayoutProps) {
+export function MuseumLayout({ frames, onCollisionBoundariesReady, onFrameClick, onMuseumSwitch, onNavigationPause, isPublicView = false }: MuseumLayoutProps) {
   const { mainHallGeometry, extendableHallGeometry, collisionBoundaries } =
     useMemo(() => {
       const geometry = generateMuseumGeometry(frames);
@@ -42,12 +43,14 @@ export function MuseumLayout({ frames, onCollisionBoundariesReady, onFrameClick,
       {/* Frame Positions */}
       <FramePositions frames={frames} onFrameClick={onFrameClick} />
 
-      {/* Portal System at end of Extendable Hall */}
-      <PortalSystem 
-        position={extendableHallGeometry.portalPosition} 
-        onMuseumSwitch={onMuseumSwitch}
-        onNavigationPause={onNavigationPause}
-      />
+      {/* Portal System at end of Extendable Hall - disabled for public view */}
+      {!isPublicView && (
+        <PortalSystem 
+          position={extendableHallGeometry.portalPosition} 
+          onMuseumSwitch={onMuseumSwitch}
+          onNavigationPause={onNavigationPause}
+        />
+      )}
 
       {/* Collision Boundaries (invisible) */}
       <CollisionBoundaries boundaries={collisionBoundaries} />

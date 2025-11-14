@@ -230,7 +230,7 @@
   - Show tutorial only on first visit per user
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 21. Implement public museum access
+- [x] 21. Implement public museum access
 
   - Create public museum page at `/museum/[shareToken]`
   - Fetch museum data using `public.getMuseumByShareToken` query (no auth)

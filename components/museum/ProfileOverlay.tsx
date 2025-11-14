@@ -2,9 +2,9 @@
 
 import { useMuseumStore } from "@/lib/store/museum-store";
 import { trpc } from "@/lib/trpc/client";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { useState } from "react";
-import { X, Copy, Check, Plus, ExternalLink, HelpCircle } from "lucide-react";
+import { X, Copy, Check, Plus, ExternalLink, HelpCircle, LogOut } from "lucide-react";
 
 export function ProfileOverlay() {
   const showProfileOverlay = useMuseumStore(
@@ -20,6 +20,7 @@ export function ProfileOverlay() {
   const setShowTutorial = useMuseumStore((state) => state.setShowTutorial);
 
   const { user } = useUser();
+  const { signOut } = useClerk();
   const utils = trpc.useUtils();
 
   const [copiedShareLink, setCopiedShareLink] = useState(false);
@@ -184,6 +185,10 @@ export function ProfileOverlay() {
     setShowProfileOverlay(false);
   };
 
+  const handleSignOut = async () => {
+    await signOut({ redirectUrl: "/" });
+  };
+
   if (!showProfileOverlay) return null;
 
   const displayShareLink =
@@ -215,7 +220,7 @@ export function ProfileOverlay() {
 
         {/* User Profile Section */}
         <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 mb-4">
             {user?.imageUrl && (
               <img
                 src={user.imageUrl}
@@ -223,7 +228,7 @@ export function ProfileOverlay() {
                 className="w-16 h-16 rounded-full"
               />
             )}
-            <div>
+            <div className="flex-1">
               <h3 className="font-semibold text-lg text-gray-900">
                 {user?.fullName || user?.username || "User"}
               </h3>
@@ -232,6 +237,15 @@ export function ProfileOverlay() {
               </p>
             </div>
           </div>
+          
+          {/* Sign Out Button */}
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg font-medium transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
         </div>
 
         {/* Settings Section */}
