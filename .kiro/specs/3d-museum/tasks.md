@@ -219,7 +219,7 @@
   - Spawn user at entrance of new museum
   - _Requirements: 11.4, 11.5, 11.6_
 
-- [ ] 20. Build Tutorial Modal component
+- [x] 20. Build Tutorial Modal component
 
   - Create modal with welcome message and instructions
   - Add sections for navigation (WASD/joystick), frame interaction, AI generation

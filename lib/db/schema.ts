@@ -18,6 +18,7 @@ export const users = pgTable("users", {
   clerkId: text("clerk_id").notNull().unique(),
   email: text("email").notNull().unique(),
   profilePicUrl: text("profile_pic_url"),
+  tutorialDismissed: boolean("tutorial_dismissed").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

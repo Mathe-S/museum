@@ -4,7 +4,7 @@ import { useMuseumStore } from "@/lib/store/museum-store";
 import { trpc } from "@/lib/trpc/client";
 import { useUser } from "@clerk/nextjs";
 import { useState } from "react";
-import { X, Copy, Check, Plus, ExternalLink } from "lucide-react";
+import { X, Copy, Check, Plus, ExternalLink, HelpCircle } from "lucide-react";
 
 export function ProfileOverlay() {
   const showProfileOverlay = useMuseumStore(
@@ -17,6 +17,7 @@ export function ProfileOverlay() {
   const setCurrentMuseum = useMuseumStore((state) => state.setCurrentMuseum);
   const moveSpeed = useMuseumStore((state) => state.moveSpeed);
   const setMoveSpeed = useMuseumStore((state) => state.setMoveSpeed);
+  const setShowTutorial = useMuseumStore((state) => state.setShowTutorial);
 
   const { user } = useUser();
   const utils = trpc.useUtils();
@@ -178,6 +179,11 @@ export function ProfileOverlay() {
     }
   };
 
+  const handleShowTutorial = () => {
+    setShowTutorial(true);
+    setShowProfileOverlay(false);
+  };
+
   if (!showProfileOverlay) return null;
 
   const displayShareLink =
@@ -233,7 +239,7 @@ export function ProfileOverlay() {
           <h3 className="font-semibold text-gray-900 mb-4">Settings</h3>
           
           {/* Move Speed Control */}
-          <div className="space-y-2">
+          <div className="space-y-2 mb-4">
             <div className="flex items-center justify-between">
               <label className="text-sm text-gray-700 font-medium">
                 Movement Speed
@@ -256,6 +262,15 @@ export function ProfileOverlay() {
               <span>Fast (15x)</span>
             </div>
           </div>
+
+          {/* Tutorial Button */}
+          <button
+            onClick={handleShowTutorial}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg font-medium transition-colors"
+          >
+            <HelpCircle className="w-4 h-4" />
+            View Tutorial
+          </button>
         </div>
 
         {/* Current Museum Section */}

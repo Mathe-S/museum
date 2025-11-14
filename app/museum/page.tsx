@@ -5,6 +5,7 @@ import { MuseumLayout } from "@/components/museum/MuseumLayout";
 import { FrameInteractionModal } from "@/components/museum/FrameInteractionModal";
 import { ProfileOverlay } from "@/components/museum/ProfileOverlay";
 import { MuseumSelectorUI } from "@/components/museum/MuseumSelectorUI";
+import { TutorialModal } from "@/components/museum/TutorialModal";
 import { useMuseumStore } from "@/lib/store/museum-store";
 import { trpc } from "@/lib/trpc/client";
 import { useMemo, useState, useCallback, useEffect } from "react";
@@ -19,8 +20,9 @@ export default function MuseumPage() {
   const setFrames = useMuseumStore((state) => state.setFrames);
   const setShowProfileOverlay = useMuseumStore((state) => state.setShowProfileOverlay);
   const showProfileOverlay = useMuseumStore((state) => state.showProfileOverlay);
-  const currentMuseum = useMuseumStore((state) => state.currentMuseum);
   const setCurrentMuseum = useMuseumStore((state) => state.setCurrentMuseum);
+  const showTutorial = useMuseumStore((state) => state.showTutorial);
+  const setShowTutorial = useMuseumStore((state) => state.setShowTutorial);
   
   const [collisionBoundaries, setCollisionBoundaries] = useState<THREE.Box3[]>([]);
   const [isMobile, setIsMobile] = useState(false);
@@ -28,6 +30,9 @@ export default function MuseumPage() {
   const [currentMuseumId, setCurrentMuseumId] = useState<string | null>(null);
   const [cameraPosition, setCameraPosition] = useState<[number, number, number]>([0, 1.6, -15]); // Center of main hall
   const [showMuseumSelector, setShowMuseumSelector] = useState(false);
+
+  // Fetch user profile to check tutorial dismissal status
+  const { data: userProfile } = trpc.user.getProfile.useQuery();
 
   // Test data: Create frames for demonstration
   const testFrames = useMemo(() => {
@@ -77,6 +82,31 @@ export default function MuseumPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Check if tutorial should be shown
+  useEffect(() => {
+    // Check localStorage first for instant feedback
+    const localDismissed = localStorage.getItem("tutorialDismissed") === "true";
+    
+    // If user profile is loaded, use database value as source of truth
+    if (userProfile) {
+      const dbDismissed = userProfile.tutorialDismissed;
+      
+      // Show tutorial only if not dismissed in both localStorage and database
+      if (!localDismissed && !dbDismissed) {
+        setShowTutorial(true);
+      } else {
+        setShowTutorial(false);
+        // Sync localStorage with database
+        if (dbDismissed) {
+          localStorage.setItem("tutorialDismissed", "true");
+        }
+      }
+    } else if (!localDismissed) {
+      // If profile not loaded yet, check localStorage only
+      setShowTutorial(true);
+    }
+  }, [userProfile, setShowTutorial]);
+
   // Initialize frames in store
   useEffect(() => {
     setFrames(testFrames);
@@ -97,10 +127,14 @@ export default function MuseumPage() {
     setSelectedFrame(null);
   }, [setSelectedFrame]);
 
-  // Pause navigation when profile overlay or modal is open
+  const handleTutorialClose = useCallback(() => {
+    setShowTutorial(false);
+  }, [setShowTutorial]);
+
+  // Pause navigation when profile overlay, modal, or tutorial is open
   useEffect(() => {
-    setIsNavigationPaused(showProfileOverlay || selectedFrame !== null || showMuseumSelector);
-  }, [showProfileOverlay, selectedFrame, showMuseumSelector]);
+    setIsNavigationPaused(showProfileOverlay || selectedFrame !== null || showMuseumSelector || showTutorial);
+  }, [showProfileOverlay, selectedFrame, showMuseumSelector, showTutorial]);
 
   // Listen for portal zone entered event
   useEffect(() => {
@@ -196,6 +230,9 @@ export default function MuseumPage() {
           onSelect={handleMuseumSwitch}
         />
       )}
+
+      {/* Tutorial Modal */}
+      {showTutorial && <TutorialModal onClose={handleTutorialClose} />}
 
       {/* Info overlay */}
       <div className="absolute bottom-4 left-4 z-10 bg-black/70 text-white px-4 py-3 rounded-lg max-w-md">
