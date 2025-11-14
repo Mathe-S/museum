@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 import * as THREE from "three";
+import { useMuseumStore } from "@/lib/store/museum-store";
 
 interface DesktopControlsProps {
   collisionBoundaries: THREE.Box3[];
@@ -17,11 +18,10 @@ export function DesktopControls({
   const { camera, gl } = useThree();
   const controlsRef = useRef<PointerLockControlsImpl | null>(null);
   const velocityRef = useRef(new THREE.Vector3());
-  const directionRef = useRef(new THREE.Vector3());
   const keysPressed = useRef<{ [key: string]: boolean }>({});
+  const yawRef = useRef(0); // Track Y-axis rotation separately
 
-  // Movement speed: 5 units/second
-  const MOVE_SPEED = 5.0;
+  const moveSpeed = useMuseumStore((state) => state.moveSpeed);
   const PLAYER_HEIGHT = 1.6;
   const COLLISION_RADIUS = 0.5;
 
@@ -82,36 +82,41 @@ export function DesktopControls({
     }
 
     const velocity = velocityRef.current;
-    const direction = directionRef.current;
+    const ROTATION_SPEED = 2.0; // radians per second
+
+    // Handle camera rotation with A/D - only rotate around Y axis
+    // We need to add to the existing rotation from mouse movement
+    if (keysPressed.current["KeyA"]) {
+      yawRef.current += ROTATION_SPEED * delta;
+      
+      // Apply additional yaw rotation to the camera
+      const euler = new THREE.Euler(0, 0, 0, "YXZ");
+      euler.setFromQuaternion(camera.quaternion);
+      euler.y += ROTATION_SPEED * delta;
+      camera.quaternion.setFromEuler(euler);
+    }
+    if (keysPressed.current["KeyD"]) {
+      yawRef.current -= ROTATION_SPEED * delta;
+      
+      // Apply additional yaw rotation to the camera
+      const euler = new THREE.Euler(0, 0, 0, "YXZ");
+      euler.setFromQuaternion(camera.quaternion);
+      euler.y -= ROTATION_SPEED * delta;
+      camera.quaternion.setFromEuler(euler);
+    }
 
     // Reset velocity
     velocity.x = 0;
     velocity.z = 0;
 
-    // Get movement direction based on keys pressed
-    direction.set(0, 0, 0);
-
+    // Handle forward/backward movement with W/S
+    let moveDirection = 0;
     if (keysPressed.current["KeyW"]) {
-      direction.z -= 1;
+      moveDirection = 1; // Forward
     }
     if (keysPressed.current["KeyS"]) {
-      direction.z += 1;
+      moveDirection = -1; // Backward
     }
-    if (keysPressed.current["KeyA"]) {
-      direction.x -= 1;
-    }
-    if (keysPressed.current["KeyD"]) {
-      direction.x += 1;
-    }
-
-    // Normalize direction to prevent faster diagonal movement
-    if (direction.length() > 0) {
-      direction.normalize();
-    }
-
-    // Calculate velocity based on direction and speed
-    velocity.x = direction.x * MOVE_SPEED * delta;
-    velocity.z = direction.z * MOVE_SPEED * delta;
 
     // Get current position
     const currentPosition = camera.position.clone();
@@ -119,17 +124,14 @@ export function DesktopControls({
     // Calculate new position based on camera orientation
     const moveVector = new THREE.Vector3();
 
-    // Forward/backward movement
-    const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
-    forward.y = 0; // Keep movement horizontal
-    forward.normalize();
-    moveVector.add(forward.multiplyScalar(velocity.z));
-
-    // Left/right movement
-    const right = new THREE.Vector3();
-    right.crossVectors(camera.up, forward).normalize();
-    moveVector.add(right.multiplyScalar(-velocity.x));
+    if (moveDirection !== 0) {
+      // Forward/backward movement
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      forward.y = 0; // Keep movement horizontal
+      forward.normalize();
+      moveVector.add(forward.multiplyScalar(moveDirection * moveSpeed * delta));
+    }
 
     // Calculate new position
     const newPosition = currentPosition.clone().add(moveVector);

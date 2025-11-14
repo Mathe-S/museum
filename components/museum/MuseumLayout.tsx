@@ -175,15 +175,8 @@ function MainHall({ geometry }: { geometry: any }) {
         <meshStandardMaterial color="#cccccc" />
       </mesh>
 
-      {/* Ceiling */}
-      <mesh
-        rotation={[Math.PI / 2, 0, 0]}
-        position={[0, height, -depth / 2]}
-        receiveShadow
-      >
-        <planeGeometry args={[width, depth]} />
-        <meshStandardMaterial color="#ffffff" />
-      </mesh>
+      {/* Glass Pyramid Roof (Louvre style) */}
+      <GlassPyramidRoof width={width} depth={depth} height={height} />
 
       {/* Back wall */}
       <mesh position={[0, height / 2, -depth]} receiveShadow castShadow>
@@ -202,6 +195,157 @@ function MainHall({ geometry }: { geometry: any }) {
         <boxGeometry args={[wallThickness, height, depth]} />
         <meshStandardMaterial color="#e8e8e8" />
       </mesh>
+    </group>
+  );
+}
+
+// Glass Pyramid Roof component (Louvre style)
+function GlassPyramidRoof({ width, depth, height }: { width: number; depth: number; height: number }) {
+  const pyramidHeight = 6;
+  const baseY = height;
+  const apexY = baseY + pyramidHeight;
+  
+  // Calculate pyramid vertices
+  const halfWidth = width / 2;
+  const halfDepth = depth / 2;
+
+  // Create geometries using useMemo to avoid recreating on every render
+  const frontGeometry = useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+      -halfWidth, baseY, 0,
+      halfWidth, baseY, 0,
+      0, apexY, -halfDepth,
+    ]);
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.computeVertexNormals();
+    return geometry;
+  }, [halfWidth, baseY, apexY, halfDepth]);
+
+  const rightGeometry = useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+      halfWidth, baseY, 0,
+      halfWidth, baseY, -depth,
+      0, apexY, -halfDepth,
+    ]);
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.computeVertexNormals();
+    return geometry;
+  }, [halfWidth, baseY, depth, apexY, halfDepth]);
+
+  const backGeometry = useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+      halfWidth, baseY, -depth,
+      -halfWidth, baseY, -depth,
+      0, apexY, -halfDepth,
+    ]);
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.computeVertexNormals();
+    return geometry;
+  }, [halfWidth, baseY, depth, apexY, halfDepth]);
+
+  const leftGeometry = useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+      -halfWidth, baseY, -depth,
+      -halfWidth, baseY, 0,
+      0, apexY, -halfDepth,
+    ]);
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.computeVertexNormals();
+    return geometry;
+  }, [halfWidth, baseY, depth, apexY, halfDepth]);
+
+  const edgesGeometry = useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+      // Base edges
+      -halfWidth, baseY, 0,
+      halfWidth, baseY, 0,
+      halfWidth, baseY, 0,
+      halfWidth, baseY, -depth,
+      halfWidth, baseY, -depth,
+      -halfWidth, baseY, -depth,
+      -halfWidth, baseY, -depth,
+      -halfWidth, baseY, 0,
+      // Edges to apex
+      -halfWidth, baseY, 0,
+      0, apexY, -halfDepth,
+      halfWidth, baseY, 0,
+      0, apexY, -halfDepth,
+      halfWidth, baseY, -depth,
+      0, apexY, -halfDepth,
+      -halfWidth, baseY, -depth,
+      0, apexY, -halfDepth,
+    ]);
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    return geometry;
+  }, [halfWidth, baseY, depth, apexY, halfDepth]);
+
+  return (
+    <group>
+      {/* Front face */}
+      <mesh geometry={frontGeometry}>
+        <meshPhysicalMaterial
+          color="#87ceeb"
+          transparent
+          opacity={0.3}
+          roughness={0.1}
+          metalness={0.1}
+          transmission={0.9}
+          thickness={0.5}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Right face */}
+      <mesh geometry={rightGeometry}>
+        <meshPhysicalMaterial
+          color="#87ceeb"
+          transparent
+          opacity={0.3}
+          roughness={0.1}
+          metalness={0.1}
+          transmission={0.9}
+          thickness={0.5}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Back face */}
+      <mesh geometry={backGeometry}>
+        <meshPhysicalMaterial
+          color="#87ceeb"
+          transparent
+          opacity={0.3}
+          roughness={0.1}
+          metalness={0.1}
+          transmission={0.9}
+          thickness={0.5}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Left face */}
+      <mesh geometry={leftGeometry}>
+        <meshPhysicalMaterial
+          color="#87ceeb"
+          transparent
+          opacity={0.3}
+          roughness={0.1}
+          metalness={0.1}
+          transmission={0.9}
+          thickness={0.5}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Pyramid frame edges for structure */}
+      <lineSegments geometry={edgesGeometry}>
+        <lineBasicMaterial color="#666666" />
+      </lineSegments>
     </group>
   );
 }
@@ -305,26 +449,61 @@ export function calculateFramePositions(frames: Frame[]) {
     imageUrl: string | null;
   }> = [];
 
-  // Main Hall: 3x3 grid on back wall (positions 0-8)
+  // Main Hall: Distribute 9 frames across 3 walls (back, left, right)
   const MAIN_HALL_BACK_WALL_Z = -15;
-  const FRAME_SPACING = 4;
-  const FRAME_HEIGHT_OFFSET = 2;
+  const MAIN_HALL_WIDTH = 20;
+  const MAIN_HALL_DEPTH = 15;
+  const FRAME_HEIGHT = 3.5;
 
-  for (let i = 0; i < 9; i++) {
+  // Back wall: 3 frames (positions 0, 1, 2)
+  for (let i = 0; i < 3; i++) {
     const frame = frames.find((f) => f.position === i);
     if (!frame) continue;
 
-    const row = Math.floor(i / 3);
-    const col = i % 3;
-
-    const x = (col - 1) * FRAME_SPACING;
-    const y = FRAME_HEIGHT_OFFSET + (2 - row) * FRAME_SPACING;
-    const z = MAIN_HALL_BACK_WALL_Z + 0.3; // Slightly in front of wall
+    const x = (i - 1) * 6; // Spacing of 6 units
+    const y = FRAME_HEIGHT;
+    const z = MAIN_HALL_BACK_WALL_Z + 0.3;
 
     positions.push({
       id: frame.id,
       position: new THREE.Vector3(x, y, z),
       rotation: new THREE.Euler(0, 0, 0),
+      imageUrl: frame.imageUrl,
+    });
+  }
+
+  // Left wall: 3 frames (positions 3, 4, 5)
+  for (let i = 3; i < 6; i++) {
+    const frame = frames.find((f) => f.position === i);
+    if (!frame) continue;
+
+    const wallIndex = i - 3;
+    const x = -MAIN_HALL_WIDTH / 2 + 0.3;
+    const y = FRAME_HEIGHT;
+    const z = -(wallIndex * 5 + 2.5); // Distribute along the wall
+
+    positions.push({
+      id: frame.id,
+      position: new THREE.Vector3(x, y, z),
+      rotation: new THREE.Euler(0, Math.PI / 2, 0),
+      imageUrl: frame.imageUrl,
+    });
+  }
+
+  // Right wall: 3 frames (positions 6, 7, 8)
+  for (let i = 6; i < 9; i++) {
+    const frame = frames.find((f) => f.position === i);
+    if (!frame) continue;
+
+    const wallIndex = i - 6;
+    const x = MAIN_HALL_WIDTH / 2 - 0.3;
+    const y = FRAME_HEIGHT;
+    const z = -(wallIndex * 5 + 2.5); // Distribute along the wall
+
+    positions.push({
+      id: frame.id,
+      position: new THREE.Vector3(x, y, z),
+      rotation: new THREE.Euler(0, -Math.PI / 2, 0),
       imageUrl: frame.imageUrl,
     });
   }

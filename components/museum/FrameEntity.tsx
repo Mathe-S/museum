@@ -116,9 +116,9 @@ const FrameMesh = React.forwardRef<
 
   return (
     <>
-      {/* Picture frame border */}
+      {/* Picture frame border - Made bigger */}
       <mesh onClick={onClick} ref={ref} castShadow receiveShadow>
-        <boxGeometry args={[2.8, 3.3, 0.15]} />
+        <boxGeometry args={[4.2, 5.0, 0.2]} />
         <meshStandardMaterial
           color="#8b4513"
           roughness={0.8}
@@ -126,9 +126,9 @@ const FrameMesh = React.forwardRef<
         />
       </mesh>
 
-      {/* Inner frame (where image goes) */}
-      <mesh position={[0, 0, 0.08]} onClick={onClick}>
-        <boxGeometry args={[2.5, 3, 0.05]} />
+      {/* Inner frame (where image goes) - Made bigger */}
+      <mesh position={[0, 0, 0.11]} onClick={onClick}>
+        <boxGeometry args={[3.8, 4.5, 0.05]} />
         {imageUrl && shouldLoadTexture ? (
           <ImageMaterial
             imageUrl={imageUrl}
@@ -179,6 +179,12 @@ function TextureLoader({ url }: { url: string }) {
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    // Check if URL is valid (not a placeholder like "test-image.jpg")
+    if (!url || url === "test-image.jpg" || !url.startsWith("http")) {
+      setError(true);
+      return;
+    }
+
     const loader = new THREE.TextureLoader();
     
     loader.load(
@@ -199,7 +205,10 @@ function TextureLoader({ url }: { url: string }) {
       },
       undefined,
       (err) => {
-        console.error("Error loading texture:", err);
+        // Only log error if it's not a placeholder URL
+        if (url !== "test-image.jpg") {
+          console.error("Error loading texture from URL:", url, err);
+        }
         setError(true);
       }
     );
@@ -222,8 +231,8 @@ function TextureLoader({ url }: { url: string }) {
 // Circle indicator for empty frames
 function CircleIndicator() {
   return (
-    <mesh position={[0, 0, 0.15]}>
-      <ringGeometry args={[0.4, 0.5, 32]} />
+    <mesh position={[0, 0, 0.2]}>
+      <ringGeometry args={[0.6, 0.75, 32]} />
       <meshBasicMaterial
         color="#ffffff"
         transparent
@@ -244,8 +253,8 @@ function HighlightIndicator() {
   });
 
   return (
-    <mesh position={[0, 0, 0.15]}>
-      <planeGeometry args={[2.6, 3.1]} />
+    <mesh position={[0, 0, 0.2]}>
+      <planeGeometry args={[3.9, 4.6]} />
       <meshBasicMaterial
         color="#4a90e2"
         transparent

@@ -15,6 +15,8 @@ export function ProfileOverlay() {
   );
   const currentMuseum = useMuseumStore((state) => state.currentMuseum);
   const setCurrentMuseum = useMuseumStore((state) => state.setCurrentMuseum);
+  const moveSpeed = useMuseumStore((state) => state.moveSpeed);
+  const setMoveSpeed = useMuseumStore((state) => state.setMoveSpeed);
 
   const { user } = useUser();
   const utils = trpc.useUtils();
@@ -222,6 +224,36 @@ export function ProfileOverlay() {
               <p className="text-sm text-gray-600">
                 {user?.primaryEmailAddress?.emailAddress}
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Settings Section */}
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="font-semibold text-gray-900 mb-4">Settings</h3>
+          
+          {/* Move Speed Control */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-gray-700 font-medium">
+                Movement Speed
+              </label>
+              <span className="text-sm text-gray-600 font-mono">
+                {moveSpeed.toFixed(1)}x
+              </span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="15"
+              step="0.5"
+              value={moveSpeed}
+              onChange={(e) => setMoveSpeed(parseFloat(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>Slow (1x)</span>
+              <span>Fast (15x)</span>
             </div>
           </div>
         </div>
