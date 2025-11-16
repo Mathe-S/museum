@@ -7,17 +7,18 @@ import { comments, frames, users } from "@/lib/db/schema";
 
 /**
  * Simple in-memory rate limiter for comment creation
- * Limits to 1 comment per 5 seconds per user/session
+ * Limits to 1 comment per 5 seconds per authenticated user
  */
 const commentRateLimitMap = new Map<string, number>();
 const COMMENT_RATE_LIMIT_MS = 5000; // 5 seconds
 
 /**
  * Rate limiting middleware for comment creation
+ * Only applies to authenticated users
  */
-const commentRateLimitMiddleware = publicProcedure.use(
+const commentRateLimitMiddleware = protectedProcedure.use(
   async ({ ctx, next }) => {
-    const identifier = ctx.userId || `anon-${Date.now()}-${Math.random()}`;
+    const identifier = ctx.userId; // Now guaranteed to exist from protectedProcedure
     const now = Date.now();
     const lastComment = commentRateLimitMap.get(identifier);
 
@@ -48,7 +49,7 @@ const commentRateLimitMiddleware = publicProcedure.use(
 
 /**
  * Comment router - handles comment CRUD operations
- * Supports both authenticated users and anonymous guests
+ * Reading comments is public, creating/deleting requires authentication
  */
 export const commentRouter = createTRPCRouter({
   /**
@@ -82,8 +83,8 @@ export const commentRouter = createTRPCRouter({
 
   /**
    * Create a new comment
-   * Public procedure with rate limiting - authentication optional
-   * Authenticated users get their name/picture, guests get "Anonymous Visitor"
+   * Protected procedure with rate limiting - authentication required
+   * Uses authenticated user's name and profile picture
    */
   create: commentRateLimitMiddleware
     .input(
@@ -93,7 +94,6 @@ export const commentRouter = createTRPCRouter({
           .string()
           .min(1)
           .max(500, "Comment must be 500 characters or less"),
-        authorName: z.string().optional(), // For guests
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -109,33 +109,28 @@ export const commentRouter = createTRPCRouter({
         });
       }
 
-      // Determine author details
-      let authorName = "Anonymous Visitor";
-      let authorProfilePic: string | null = null;
-      let userId: string | null = null;
+      // Fetch authenticated user details
+      const user = await db.query.users.findFirst({
+        where: eq(users.clerkId, ctx.userId),
+      });
 
-      if (ctx.userId) {
-        // Authenticated user - fetch their details
-        const user = await db.query.users.findFirst({
-          where: eq(users.clerkId, ctx.userId),
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found in database",
         });
-
-        if (user) {
-          userId = user.id;
-          authorName = user.email.split("@")[0] || "Museum Visitor"; // Use email prefix as display name
-          authorProfilePic = user.profilePicUrl;
-        }
-      } else if (input.authorName) {
-        // Guest provided a name
-        authorName = input.authorName.substring(0, 50); // Limit guest names
       }
+
+      // Use authenticated user's details
+      const authorName = user.email.split("@")[0] || "Museum Visitor";
+      const authorProfilePic = user.profilePicUrl;
 
       // Create comment
       const [newComment] = await db
         .insert(comments)
         .values({
           frameId: input.frameId,
-          userId,
+          userId: user.id,
           authorName,
           authorProfilePic,
           content: input.content,

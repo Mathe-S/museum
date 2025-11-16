@@ -5,6 +5,8 @@ import * as THREE from "three";
 import { Frame } from "@/lib/store/museum-store";
 import { trpc } from "@/lib/trpc/client";
 import { useMuseumStore } from "@/lib/store/museum-store";
+import { usePartyKitPresence } from "@/lib/hooks/usePartyKitPresence";
+import { CommentThread } from "./CommentThread";
 import {
   X,
   Camera,
@@ -13,6 +15,7 @@ import {
   ChevronDown,
   Link as LinkIcon,
   Check,
+  MessageSquare,
 } from "lucide-react";
 
 interface FrameInteractionModalProps {
@@ -22,7 +25,7 @@ interface FrameInteractionModalProps {
   isPublicView?: boolean;
 }
 
-type PanelView = "main" | "camera" | "ai";
+type PanelView = "main" | "camera" | "ai" | "comments";
 
 export function FrameInteractionModal({
   frame,
@@ -183,6 +186,15 @@ export function FrameInteractionModal({
   };
 
   const [shareSuccess, setShareSuccess] = useState(false);
+
+  // Get museum ID from frames (they all belong to same museum)
+  const museumId = frames[0]?.museumId || "";
+
+  // PartyKit presence for real-time comment broadcasting
+  const { broadcastComment, broadcastCommentDelete } = usePartyKitPresence({
+    museumId,
+    enabled: !!museumId && !isPublicView,
+  });
 
   const handleShare = async () => {
     if (!frame || !frame.imageUrl || isPublicView) return;
@@ -790,6 +802,17 @@ export function FrameInteractionModal({
                       Generate with AI
                     </button>
 
+                    {/* Comments Button for filled frames */}
+                    {!isEmpty && (
+                      <button
+                        onClick={() => setActiveView("comments")}
+                        className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        View Comments
+                      </button>
+                    )}
+
                     {/* Share + Delete Row for filled frames */}
                     {!isEmpty && !isPublicView && (
                       <div className="flex gap-2">
@@ -967,6 +990,50 @@ export function FrameInteractionModal({
                   ? "Generating..."
                   : "Generate with Luvre"}
               </button>
+            </div>
+          )}
+
+          {/* Comments View */}
+          {activeView === "comments" && !isEmpty && (
+            <div className="flex flex-col h-full">
+              <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200">
+                <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  Comments
+                </h3>
+                <button
+                  onClick={() => setActiveView("main")}
+                  className="text-xs text-gray-500 hover:text-gray-800"
+                >
+                  Back
+                </button>
+              </div>
+
+              {/* CommentThread takes full height */}
+              <div className="flex-1 min-h-0 -mx-4 -mb-4">
+                <CommentThread
+                  frameId={frame.id}
+                  onBroadcastComment={
+                    !isPublicView
+                      ? (text, authorName, authorPicture) => {
+                          broadcastComment(
+                            frame.id,
+                            text,
+                            authorName,
+                            authorPicture
+                          );
+                        }
+                      : undefined
+                  }
+                  onBroadcastCommentDelete={
+                    !isPublicView
+                      ? (commentId) => {
+                          broadcastCommentDelete(frame.id, commentId);
+                        }
+                      : undefined
+                  }
+                />
+              </div>
             </div>
           )}
         </div>

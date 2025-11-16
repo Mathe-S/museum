@@ -46,16 +46,16 @@ interface CommentThreadProps {
  * - Optimistic UI updates
  * - Character counter (500 max)
  * - Delete permissions (owner or museum owner)
- * - Guest support
+ * - Authentication required to post comments
+ * - Anonymous users can read comments only
  */
 export function CommentThread({
   frameId,
   onBroadcastComment,
   onBroadcastCommentDelete,
 }: CommentThreadProps) {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const [commentText, setCommentText] = useState("");
-  const [guestName, setGuestName] = useState("");
   const commentsEndRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useContext();
 
@@ -79,9 +79,7 @@ export function CommentThread({
         id: tempId,
         frameId,
         userId: user?.id || null,
-        authorName: user
-          ? user.fullName || user.username || "User"
-          : guestName || "Anonymous Visitor",
+        authorName: user?.fullName || user?.username || "User",
         authorProfilePic: user?.imageUrl || null,
         content: newComment.content,
         createdAt: new Date(),
@@ -191,14 +189,13 @@ export function CommentThread({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user) return; // Must be authenticated
     if (!commentText.trim() || commentText.length > 500) return;
-    if (!user && !guestName.trim()) return;
 
     try {
       await createCommentMutation.mutateAsync({
         frameId,
         content: commentText.trim(),
-        authorName: !user ? guestName.trim() : undefined,
       });
 
       setCommentText("");
@@ -225,9 +222,9 @@ export function CommentThread({
   const characterCount = commentText.length;
   const isOverLimit = characterCount > 500;
   const isSubmitDisabled =
+    !user ||
     !commentText.trim() ||
     isOverLimit ||
-    (!user && !guestName.trim()) ||
     createCommentMutation.isPending;
 
   return (
@@ -294,83 +291,81 @@ export function CommentThread({
         ) : (
           <div className="flex items-center justify-center h-32">
             <p className="text-sm text-gray-500">
-              No comments yet. Be the first to comment!
+              {user
+                ? "No comments yet. Be the first to comment!"
+                : "No comments yet."}
             </p>
           </div>
         )}
       </div>
 
-      {/* Comment Input */}
-      <div className="border-t border-gray-200 p-4 bg-gray-50">
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Guest Name Input */}
-          {!user && (
-            <input
-              type="text"
-              value={guestName}
-              onChange={(e) => setGuestName(e.target.value)}
-              placeholder="Your name (optional)"
-              maxLength={50}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          )}
+      {/* Comment Input - Only for authenticated users */}
+      {user ? (
+        <div className="border-t border-gray-200 p-4 bg-gray-50">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {/* Comment Text Input */}
+            <div className="relative">
+              <textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="Write a comment..."
+                rows={3}
+                maxLength={550} // Allow typing a bit over to show error
+                className={
+                  isOverLimit
+                    ? "w-full px-3 py-2 text-sm border border-red-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                    : "w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                }
+              />
 
-          {/* Comment Text Input */}
-          <div className="relative">
-            <textarea
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Write a comment..."
-              rows={3}
-              maxLength={550} // Allow typing a bit over to show error
-              className={
-                isOverLimit
-                  ? "w-full px-3 py-2 text-sm border border-red-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-                  : "w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              }
-            />
-
-            {/* Character Counter */}
-            <div
-              className={
-                isOverLimit
-                  ? "absolute bottom-2 right-2 text-xs text-red-600 font-medium"
-                  : "absolute bottom-2 right-2 text-xs text-gray-400"
-              }
-            >
-              {characterCount}/500
+              {/* Character Counter */}
+              <div
+                className={
+                  isOverLimit
+                    ? "absolute bottom-2 right-2 text-xs text-red-600 font-medium"
+                    : "absolute bottom-2 right-2 text-xs text-gray-400"
+                }
+              >
+                {characterCount}/500
+              </div>
             </div>
-          </div>
 
-          {/* Submit Button */}
-          <div className="flex justify-between items-center">
-            {createCommentMutation.isError && (
-              <p className="text-xs text-red-600">
-                {createCommentMutation.error?.message ||
-                  "Failed to post comment"}
-              </p>
-            )}
-            <div className="flex-1" />
-            <button
-              type="submit"
-              disabled={isSubmitDisabled}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {createCommentMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Posting...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  Comment
-                </>
+            {/* Submit Button */}
+            <div className="flex justify-between items-center">
+              {createCommentMutation.isError && (
+                <p className="text-xs text-red-600">
+                  {createCommentMutation.error?.message ||
+                    "Failed to post comment"}
+                </p>
               )}
-            </button>
-          </div>
-        </form>
-      </div>
+              <div className="flex-1" />
+              <button
+                type="submit"
+                disabled={isSubmitDisabled}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {createCommentMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Posting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Comment
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        <div className="border-t border-gray-200 p-4 bg-gray-50">
+          <p className="text-sm text-gray-600 text-center">
+            {isLoaded ? "Sign in to leave a comment" : "Loading..."}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

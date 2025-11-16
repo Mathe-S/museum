@@ -264,14 +264,14 @@
 - [x] 24. Implement comment tRPC router
 
   - Create comment router at `/server/routers/comment.ts`
-  - Implement `comment.listByFrame` query to fetch all comments for a frame
-  - Implement `comment.create` mutation to create new comment (auth optional)
-  - Implement `comment.delete` mutation to delete comment (owner only)
-  - Validate comment length (max 500 characters) with Zod schema
-  - Implement rate limiting middleware (max 1 comment per 5 seconds per user)
-  - Store author name as "Anonymous Visitor" for guests
-  - Store user profile picture for authenticated users
-  - Verify museum ownership before allowing comment deletion
+  - Implement `comment.listByFrame` query to fetch all comments for a frame (public)
+  - Implement `comment.create` mutation with authentication and rate limiting (1 per 5 seconds)
+  - Implement `comment.delete` mutation with ownership validation (protected)
+  - Only authenticated users can create comments
+  - Anonymous users can read comments but not post
+  - Authenticated users get their name and profile picture from database
+  - Validate comment content length (max 500 characters)
+  - Verify comment ownership or museum ownership before allowing deletion
   - _Requirements: 17.4, 17.6, 17.7, 17.8, 18.1, 18.2, 18.5_
 
 - [x] 25. Build Partykit Presence Manager
@@ -313,19 +313,19 @@
 - [x] 28. Build Comment Thread component
 
   - Create scrollable comment list UI component
-  - Fetch comments using `comment.listByFrame` query
+  - Fetch comments using `comment.listByFrame` query (public - no auth required)
   - Display comments with profile picture, name, text, and timestamp
-  - Show "Anonymous Visitor" for guest comments
   - Add text input field for new comments with character counter (500 max)
-  - Implement submit button using `comment.create` mutation
+  - Implement submit button using `comment.create` mutation (auth required)
   - Add delete button using `comment.delete` mutation (conditional rendering)
   - Implement optimistic UI updates for new comments with React Query
   - Connect to Partykit for real-time comment updates
   - Handle incoming comment broadcasts and invalidate React Query cache
   - Handle incoming comment deletion broadcasts and update cache
+  - Show "Sign in to leave a comment" message for anonymous users
   - _Requirements: 17.1, 17.2, 17.3, 17.5, 17.6, 17.7, 17.8, 18.1, 18.3_
 
-- [ ] 29. Integrate comments into Frame Interaction Modal
+- [x] 29. Integrate comments into Frame Interaction Modal
 
   - Add Comment Thread section to filled frame modal state
   - Fetch comments using `comment.listByFrame` query when modal opens
@@ -338,7 +338,6 @@
 - [ ] 30. Implement performance optimizations
 
   - Add texture compression for all frame images
-  - Implement lazy loading: load textures within 15 units, unload beyond 30 units
   - Use instanced meshes for repeated frame geometries and visitor avatars
   - Implement LOD system for frames and avatars based on distance
   - Enable frustum culling in renderer
