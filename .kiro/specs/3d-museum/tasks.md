@@ -310,7 +310,7 @@
   - Optimize avatar rendering performance
   - _Requirements: 16.3, 16.4, 16.5, 16.6_
 
-- [ ] 28. Build Comment Thread component
+- [x] 28. Build Comment Thread component
 
   - Create scrollable comment list UI component
   - Fetch comments using `comment.listByFrame` query
