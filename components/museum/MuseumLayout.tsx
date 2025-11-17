@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { FrameEntity } from "./FrameEntity";
 import { PortalSystem } from "./PortalSystem";
 import { RobberCharacter3D } from "./RobberCharacter3D";
+import { VisitorAvatarManager } from "./VisitorAvatar";
 import { useMuseumStore } from "@/lib/store/museum-store";
 
 interface Frame {
@@ -33,6 +34,7 @@ export function MuseumLayout({
 }: MuseumLayoutProps) {
   const robberTarget = useMuseumStore((state) => state.robberTarget);
   const clearRobber = useMuseumStore((state) => state.clearRobber);
+  const visitors = useMuseumStore((state) => state.visitors);
 
   const { mainHallGeometry, extendableHallGeometry, collisionBoundaries } =
     useMemo(() => {
@@ -66,6 +68,9 @@ export function MuseumLayout({
           onComplete={clearRobber}
         />
       )}
+
+      {/* Visitor Avatars - real-time multiplayer presence */}
+      <VisitorAvatarManager visitors={visitors} maxVisitors={50} />
 
       {/* Portal System at end of Extendable Hall - disabled for public view */}
       {!isPublicView && (

@@ -4,6 +4,7 @@ import { MuseumSceneManager } from "@/components/museum/MuseumSceneManager";
 import { MuseumLayout } from "@/components/museum/MuseumLayout";
 import { FrameInteractionModal } from "@/components/museum/FrameInteractionModal";
 import { ProfileOverlay } from "@/components/museum/ProfileOverlay";
+import { VisitorCountIndicator } from "@/components/museum/VisitorCountIndicator";
 import { MuseumSelectorUI } from "@/components/museum/MuseumSelectorUI";
 import { TutorialModal } from "@/components/museum/TutorialModal";
 import { useMuseumStore } from "@/lib/store/museum-store";
@@ -244,6 +245,9 @@ export default function MuseumPage() {
 
       {/* UI Overlay - Top Right Controls */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
+        {/* Visitor Count Indicator */}
+        <VisitorCountIndicator />
+
         <button
           onClick={() => setShowProfileOverlay(true)}
           className="px-4 py-2 bg-white/90 hover:bg-white text-black rounded-lg shadow-lg font-medium transition-colors"

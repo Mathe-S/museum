@@ -3,6 +3,7 @@
 import { MuseumSceneManager } from "@/components/museum/MuseumSceneManager";
 import { MuseumLayout } from "@/components/museum/MuseumLayout";
 import { FrameInteractionModal } from "@/components/museum/FrameInteractionModal";
+import { VisitorCountIndicator } from "@/components/museum/VisitorCountIndicator";
 import { useMuseumStore } from "@/lib/store/museum-store";
 import { trpc } from "@/lib/trpc/client";
 import { use, useState, useCallback, useEffect } from "react";
@@ -185,6 +186,9 @@ export default function FrameSharePage({ params }: FrameSharePageProps) {
 
       {/* UI Overlay - Top Right Controls */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
+        {/* Visitor Count Indicator */}
+        <VisitorCountIndicator />
+
         <button
           onClick={toggleTheme}
           className="px-4 py-2 bg-white/90 hover:bg-white text-black rounded-lg shadow-lg font-medium transition-colors"

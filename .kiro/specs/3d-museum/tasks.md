@@ -301,7 +301,7 @@
   - Cull avatars outside camera frustum
   - _Requirements: 16.3, 16.4, 16.7_
 
-- [ ] 27. Integrate visitor avatars into museum scene
+- [x] 27. Integrate visitor avatars into museum scene
 
   - Render Visitor Avatar components for all visitors in Zustand store
   - Update avatar positions in real-time from store updates

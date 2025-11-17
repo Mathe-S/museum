@@ -3,6 +3,7 @@
 import { MuseumSceneManager } from "@/components/museum/MuseumSceneManager";
 import { MuseumLayout } from "@/components/museum/MuseumLayout";
 import { FrameInteractionModal } from "@/components/museum/FrameInteractionModal";
+import { VisitorCountIndicator } from "@/components/museum/VisitorCountIndicator";
 import { useMuseumStore } from "@/lib/store/museum-store";
 import { trpc } from "@/lib/trpc/client";
 import { use, useState, useCallback, useEffect } from "react";
@@ -16,31 +17,37 @@ interface PublicMuseumPageProps {
 
 export default function PublicMuseumPage({ params }: PublicMuseumPageProps) {
   const { shareToken } = use(params);
-  
+
   const themeMode = useMuseumStore((state) => state.themeMode);
   const toggleTheme = useMuseumStore((state) => state.toggleTheme);
   const selectedFrame = useMuseumStore((state) => state.selectedFrame);
   const setSelectedFrame = useMuseumStore((state) => state.setSelectedFrame);
   const setFrames = useMuseumStore((state) => state.setFrames);
   const setCurrentMuseum = useMuseumStore((state) => state.setCurrentMuseum);
-  
-  const [collisionBoundaries, setCollisionBoundaries] = useState<THREE.Box3[]>([]);
+
+  const [collisionBoundaries, setCollisionBoundaries] = useState<THREE.Box3[]>(
+    []
+  );
   const [isMobile, setIsMobile] = useState(false);
   const [isNavigationPaused, setIsNavigationPaused] = useState(false);
   const [cameraPosition] = useState<[number, number, number]>([0, 1.6, -15]);
 
   // Fetch public museum data
-  const { data: museumData, isLoading, error } = trpc.public.getMuseumByShareToken.useQuery({
+  const {
+    data: museumData,
+    isLoading,
+    error,
+  } = trpc.public.getMuseumByShareToken.useQuery({
     shareToken,
   });
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768 || 'ontouchstart' in window);
+      setIsMobile(window.innerWidth <= 768 || "ontouchstart" in window);
     };
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   // Update store when museum data is loaded
@@ -56,31 +63,37 @@ export default function PublicMuseumPage({ params }: PublicMuseumPageProps) {
         createdAt: museumData.createdAt,
         updatedAt: museumData.createdAt, // Use createdAt as fallback
       };
-      
-      const framesData = museumData.frames.map(frame => ({
+
+      const framesData = museumData.frames.map((frame) => ({
         ...frame,
         themeColors: frame.themeColors as string[] | null,
       }));
-      
+
       setCurrentMuseum(museum);
       setFrames(framesData);
     }
   }, [museumData, shareToken, setCurrentMuseum, setFrames]);
 
-  const handleCollisionBoundariesReady = useCallback((boundaries: THREE.Box3[]) => {
-    setCollisionBoundaries(boundaries);
-  }, []);
+  const handleCollisionBoundariesReady = useCallback(
+    (boundaries: THREE.Box3[]) => {
+      setCollisionBoundaries(boundaries);
+    },
+    []
+  );
 
-  const handleFrameClick = useCallback((frameId: string) => {
-    if (!museumData) return;
-    const frame = museumData.frames.find((f) => f.id === frameId);
-    if (frame) {
-      setSelectedFrame({
-        ...frame,
-        themeColors: frame.themeColors as string[] | null,
-      });
-    }
-  }, [museumData, setSelectedFrame]);
+  const handleFrameClick = useCallback(
+    (frameId: string) => {
+      if (!museumData) return;
+      const frame = museumData.frames.find((f) => f.id === frameId);
+      if (frame) {
+        setSelectedFrame({
+          ...frame,
+          themeColors: frame.themeColors as string[] | null,
+        });
+      }
+    },
+    [museumData, setSelectedFrame]
+  );
 
   const handleModalClose = useCallback(() => {
     setSelectedFrame(null);
@@ -105,7 +118,9 @@ export default function PublicMuseumPage({ params }: PublicMuseumPageProps) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">
-          <h1 className="text-white text-2xl font-bold mb-4">Museum Not Found</h1>
+          <h1 className="text-white text-2xl font-bold mb-4">
+            Museum Not Found
+          </h1>
           <p className="text-gray-400 mb-6">
             {error.message || "This museum is private or the link is invalid."}
           </p>
@@ -127,13 +142,13 @@ export default function PublicMuseumPage({ params }: PublicMuseumPageProps) {
   return (
     <div className="relative h-screen w-screen">
       {/* 3D Scene */}
-      <MuseumSceneManager 
+      <MuseumSceneManager
         collisionBoundaries={collisionBoundaries}
         navigationEnabled={!isNavigationPaused}
         cameraPosition={cameraPosition}
       >
-        <MuseumLayout 
-          frames={museumData.frames} 
+        <MuseumLayout
+          frames={museumData.frames}
           onCollisionBoundariesReady={handleCollisionBoundariesReady}
           onFrameClick={handleFrameClick}
           onMuseumSwitch={() => {}} // Disabled for public access
@@ -152,6 +167,9 @@ export default function PublicMuseumPage({ params }: PublicMuseumPageProps) {
 
       {/* UI Overlay - Top Right Controls */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
+        {/* Visitor Count Indicator */}
+        <VisitorCountIndicator />
+
         <button
           onClick={toggleTheme}
           className="px-4 py-2 bg-white/90 hover:bg-white text-black rounded-lg shadow-lg font-medium transition-colors"
@@ -172,13 +190,13 @@ export default function PublicMuseumPage({ params }: PublicMuseumPageProps) {
           Current theme: <span className="font-semibold">{themeMode}</span>
         </p>
         <p className="text-xs opacity-75 mt-2">
-          {isMobile 
+          {isMobile
             ? "Use the joystick to move and drag the screen to look around."
-            : "Click to lock pointer, then use WASD to move and mouse to look around. Press ESC to unlock."
-          }
+            : "Click to lock pointer, then use WASD to move and mouse to look around. Press ESC to unlock."}
         </p>
         <p className="text-xs opacity-75 mt-1">
-          Click on frames to view details. Navigation is {isNavigationPaused ? "paused" : "active"}.
+          Click on frames to view details. Navigation is{" "}
+          {isNavigationPaused ? "paused" : "active"}.
         </p>
       </div>
     </div>
