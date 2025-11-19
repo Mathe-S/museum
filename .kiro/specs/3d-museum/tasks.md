@@ -274,7 +274,7 @@
   - Verify museum ownership before allowing comment deletion
   - _Requirements: 17.4, 17.6, 17.7, 17.8, 18.1, 18.2, 18.5_
 
-- [ ] 25. Build Partykit Presence Manager
+- [x] 25. Build Partykit Presence Manager
 
   - Create Partykit client connection manager
   - Connect to museum room on museum entry using museum ID
