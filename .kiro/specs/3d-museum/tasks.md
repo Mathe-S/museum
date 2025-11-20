@@ -261,7 +261,7 @@
   - Deploy Partykit server configuration
   - _Requirements: 16.1, 16.2, 17.5, 18.3_
 
-- [ ] 24. Implement comment tRPC router
+- [x] 24. Implement comment tRPC router
 
   - Create comment router at `/server/routers/comment.ts`
   - Implement `comment.listByFrame` query to fetch all comments for a frame

@@ -4,6 +4,7 @@ import { frameRouter } from "./routers/frame";
 import { imageRouter } from "./routers/image";
 import { publicRouter } from "./routers/public";
 import { userRouter } from "./routers/user";
+import { commentRouter } from "./routers/comment";
 
 /**
  * Root tRPC router
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   image: imageRouter,
   public: publicRouter,
   user: userRouter,
+  comment: commentRouter,
 });
 
 export type AppRouter = typeof appRouter;
