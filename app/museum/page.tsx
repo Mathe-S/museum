@@ -42,6 +42,42 @@ export default function MuseumPage() {
   // Fetch user profile to check tutorial dismissal status
   const { data: userProfile } = trpc.user.getProfile.useQuery();
 
+  // Placeholder frames for loading state
+  const placeholderFrames = useMemo(() => {
+    const framesList = [];
+    // Main Hall: 9 frames
+    for (let i = 0; i < 9; i++) {
+      framesList.push({
+        id: `placeholder-${i}`,
+        museumId: "",
+        position: i,
+        side: null,
+        imageUrl: null,
+        description: null,
+        themeColors: null,
+        shareToken: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+    // Extendable Hall: 6 frames
+    for (let i = 9; i < 15; i++) {
+      framesList.push({
+        id: `placeholder-${i}`,
+        museumId: "",
+        position: i,
+        side: (i - 9) % 2 === 0 ? "left" : "right",
+        imageUrl: null,
+        description: null,
+        themeColors: null,
+        shareToken: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+    return framesList;
+  }, []);
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768 || "ontouchstart" in window);
@@ -179,7 +215,9 @@ export default function MuseumPage() {
       >
         <MuseumLayout
           frames={
-            currentMuseumId && museumData ? museumData.frames : []
+            currentMuseumId && museumData 
+              ? museumData.frames 
+              : placeholderFrames
           }
           onCollisionBoundariesReady={handleCollisionBoundariesReady}
           onFrameClick={handleFrameClick}

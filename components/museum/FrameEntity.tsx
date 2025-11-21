@@ -22,7 +22,8 @@ export function FrameEntity({
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   const [isHovered, setIsHovered] = useState(false); // Crosshair on frame
-  const [shouldLoadTexture, setShouldLoadTexture] = useState(false);
+  // Default to true so images try to load immediately. We rely on LOD/distance for unloading if needed.
+  const [shouldLoadTexture, setShouldLoadTexture] = useState(true);
   const { camera } = useThree();
 
   // Calculate distance from camera to determine LOD and lazy loading
@@ -31,13 +32,13 @@ export function FrameEntity({
 
     const distance = camera.position.distanceTo(position);
 
-    // Lazy loading: load texture within 15 units
-    if (distance <= 15 && !shouldLoadTexture && imageUrl) {
+    // Lazy loading: load texture within 60 units
+    if (distance <= 60 && !shouldLoadTexture && imageUrl) {
       setShouldLoadTexture(true);
     }
 
-    // Unload texture beyond 30 units to save memory
-    if (distance > 30 && shouldLoadTexture) {
+    // Unload texture beyond 80 units to save memory (increased buffer)
+    if (distance > 80 && shouldLoadTexture) {
       setShouldLoadTexture(false);
     }
   });
@@ -56,12 +57,12 @@ export function FrameEntity({
     ];
 
     let shouldHover = false;
-    
+
     for (const point of centerPoints) {
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(point, camera);
       const intersects = raycaster.intersectObject(meshRef.current);
-      
+
       if (intersects.length > 0) {
         shouldHover = true;
         break;
@@ -82,11 +83,9 @@ export function FrameEntity({
       }
     };
 
-    window.addEventListener('frameClick', handleFrameClick);
-    return () => window.removeEventListener('frameClick', handleFrameClick);
+    window.addEventListener("frameClick", handleFrameClick);
+    return () => window.removeEventListener("frameClick", handleFrameClick);
   }, [id, onFrameClick]);
-
-
 
   return (
     <group ref={groupRef} position={position} rotation={rotation}>
@@ -98,8 +97,8 @@ export function FrameEntity({
         shouldLoadTexture={shouldLoadTexture}
       />
 
-      {/* Circle indicator when crosshair is on frame */}
-      {isHovered && <CircleIndicator />}
+      {/* Circle indicator when crosshair is on frame (only if empty) */}
+      {isHovered && !imageUrl && <CircleIndicator />}
     </group>
   );
 }
@@ -131,35 +130,21 @@ const FrameMesh = React.forwardRef<
   return (
     <>
       {/* Picture frame border - Made bigger */}
-      <mesh 
-        ref={ref} 
-        castShadow 
-        receiveShadow
-        userData={{ frameId }}
-      >
+      <mesh ref={ref} castShadow receiveShadow userData={{ frameId }}>
         <boxGeometry args={[4.2, 5.0, 0.2]} />
-        <meshStandardMaterial
-          color="#8b4513"
-          roughness={0.8}
-          metalness={0.2}
-        />
+        <meshStandardMaterial color="#8b4513" roughness={0.8} metalness={0.2} />
       </mesh>
 
-      {/* Inner frame (where image goes) - Made bigger */}
-      <mesh 
-        position={[0, 0, 0.11]}
-        userData={{ frameId }}
-      >
+      {/* Inner frame backing */}
+      <mesh position={[0, 0, 0.1]} userData={{ frameId }}>
         <boxGeometry args={[3.8, 4.5, 0.05]} />
-        {imageUrl && shouldLoadTexture ? (
-          <ImageMaterial
-            imageUrl={imageUrl}
-            lod={currentLOD}
-          />
-        ) : (
-          <meshStandardMaterial color="#1a1a1a" />
-        )}
+        <meshStandardMaterial color="#1a1a1a" />
       </mesh>
+
+      {/* Image Plane */}
+      {imageUrl && shouldLoadTexture && (
+        <AsyncImage imageUrl={imageUrl} frameId={frameId} />
+      )}
     </>
   );
 });
@@ -168,25 +153,29 @@ FrameMesh.displayName = "FrameMesh";
 
 import { trpc } from "@/lib/trpc/client";
 
-// Image material component with texture loading
-function ImageMaterial({
+// AsyncImage component that handles signed URLs and texture loading with spinner
+function AsyncImage({
   imageUrl,
-  lod,
+  frameId,
 }: {
   imageUrl: string;
-  lod: "high" | "low";
+  frameId: string;
 }) {
   const [textureUrl, setTextureUrl] = useState<string | null>(null);
-  
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
   // Query to get signed URL if needed
   const { data: signedUrlData } = trpc.image.getSignedUrl.useQuery(
     { filename: imageUrl },
-    { 
+    {
       enabled: !!imageUrl && !imageUrl.startsWith("http"),
-      staleTime: 1000 * 60 * 55, // Cache for 55 minutes (urls expire in 60)
+      staleTime: 1000 * 60 * 55, // Cache for 55 minutes
     }
   );
 
+  // Resolve texture URL
   useEffect(() => {
     if (imageUrl.startsWith("http")) {
       setTextureUrl(imageUrl);
@@ -195,66 +184,85 @@ function ImageMaterial({
     }
   }, [imageUrl, signedUrlData]);
 
-  if (!textureUrl) {
-    return <meshStandardMaterial color="#1a1a1a" />;
-  }
-
-  return <TextureLoader url={textureUrl} />;
-}
-
-// Texture loader component
-function TextureLoader({ url }: { url: string }) {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  const [error, setError] = useState(false);
-
+  // Load texture once URL is resolved
   useEffect(() => {
-    // Check if URL is valid (not a placeholder like "test-image.jpg")
-    if (!url || url === "test-image.jpg" || !url.startsWith("http")) {
-      setError(true);
-      return;
-    }
+    if (!textureUrl) return;
 
+    setLoading(true);
     const loader = new THREE.TextureLoader();
-    
+
     loader.load(
-      url,
+      textureUrl,
       (loadedTexture) => {
-        // Compress textures and generate mipmaps
-        loadedTexture.generateMipmaps = true;
-        loadedTexture.minFilter = THREE.LinearMipmapLinearFilter;
-        loadedTexture.magFilter = THREE.LinearFilter;
-        loadedTexture.anisotropy = 4;
-        
-        // Set texture wrapping
         loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
         loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-        
+        loadedTexture.colorSpace = THREE.SRGBColorSpace;
+
         setTexture(loadedTexture);
+        setLoading(false);
         setError(false);
       },
       undefined,
       (err) => {
-        // Only log error if it's not a placeholder URL
-        if (url !== "test-image.jpg") {
-          console.error("Error loading texture from URL:", url, err);
+        if (textureUrl !== "test-image.jpg") {
+          console.error("Error loading texture:", err);
         }
         setError(true);
+        setLoading(false);
       }
     );
 
     return () => {
-      // Cleanup texture on unmount
-      if (texture) {
-        texture.dispose();
-      }
+      if (texture) texture.dispose();
     };
-  }, [url]);
+  }, [textureUrl]);
 
-  if (error || !texture) {
-    return <meshStandardMaterial color="#1a1a1a" />;
+  if (loading) {
+    return (
+      <group>
+        {/* Dark background while loading */}
+        <mesh position={[0, 0, 0.14]} userData={{ frameId }}>
+          <planeGeometry args={[3.8, 4.5]} />
+          <meshStandardMaterial color="#111111" />
+        </mesh>
+        <LoadingSpinner />
+      </group>
+    );
   }
 
-  return <meshStandardMaterial map={texture} />;
+  if (error || !texture) {
+    return (
+      <mesh position={[0, 0, 0.14]} userData={{ frameId }}>
+        <planeGeometry args={[3.8, 4.5]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+    );
+  }
+
+  return (
+    <mesh position={[0, 0, 0.14]} userData={{ frameId }}>
+      <planeGeometry args={[3.8, 4.5]} />
+      <meshBasicMaterial map={texture} toneMapped={false} />
+    </mesh>
+  );
+}
+
+// Loading spinner component
+function LoadingSpinner() {
+  const ref = useRef<THREE.Mesh>(null);
+
+  useFrame((state, delta) => {
+    if (ref.current) {
+      ref.current.rotation.z -= delta * 4; // Rotate
+    }
+  });
+
+  return (
+    <mesh ref={ref} position={[0, 0, 0.15]}>
+      <ringGeometry args={[0.4, 0.5, 32]} />
+      <meshBasicMaterial color="#ffffff" transparent opacity={0.8} />
+    </mesh>
+  );
 }
 
 // Circle indicator for empty frames
@@ -271,5 +279,3 @@ function CircleIndicator() {
     </mesh>
   );
 }
-
-

@@ -6,6 +6,10 @@ import { useEffect, useState, useCallback } from "react";
 import * as THREE from "three";
 import { DesktopControls } from "./DesktopControls";
 import { MobileControls, VirtualJoystick } from "./MobileControls";
+import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { trpc } from "@/lib/trpc/client";
+import { httpBatchLink } from "@trpc/client";
+import superjson from "superjson";
 
 interface MuseumSceneManagerProps {
   children?: React.ReactNode;
@@ -18,6 +22,31 @@ export function MuseumSceneManager({ children, collisionBoundaries = [], navigat
   const themeMode = useMuseumStore((state) => state.themeMode);
   const [isMobile, setIsMobile] = useState(false);
   const [joystickDirection, setJoystickDirection] = useState({ x: 0, y: 0 });
+  const queryClient = useQueryClient();
+
+  // Recreate TRPC client to bridge context into Canvas
+  const [trpcClient] = useState(() => {
+    // Handle SSR case
+    if (typeof window === 'undefined') {
+      return trpc.createClient({
+        links: [
+          httpBatchLink({
+            url: '/api/trpc', // Fallback for SSR (though this component usually runs on client)
+            transformer: superjson,
+          }),
+        ],
+      });
+    }
+    
+    return trpc.createClient({
+      links: [
+        httpBatchLink({
+          url: `${window.location.origin}/api/trpc`,
+          transformer: superjson,
+        }),
+      ],
+    });
+  });
 
   useEffect(() => {
     // Detect if device is mobile
@@ -96,7 +125,11 @@ export function MuseumSceneManager({ children, collisionBoundaries = [], navigat
       )}
 
       {/* Children components (museum layout, frames, etc.) */}
-      {children}
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      </trpc.Provider>
     </Canvas>
     {/* Virtual joystick overlay for mobile */}
     {isMobile && <VirtualJoystick onDirectionChange={handleJoystickChange} />}
