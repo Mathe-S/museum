@@ -42,45 +42,6 @@ export default function MuseumPage() {
   // Fetch user profile to check tutorial dismissal status
   const { data: userProfile } = trpc.user.getProfile.useQuery();
 
-  // Test data: Create frames for demonstration
-  const testFrames = useMemo(() => {
-    const framesList = [];
-
-    // Main Hall: 9 frames (positions 0-8)
-    for (let i = 0; i < 9; i++) {
-      framesList.push({
-        id: `frame-${i}`,
-        museumId: "test-museum",
-        position: i,
-        side: null,
-        imageUrl: i % 3 === 0 ? "test-image.jpg" : null, // Some filled, some empty
-        description: i % 3 === 0 ? `Test frame ${i}` : null,
-        themeColors: i % 3 === 0 ? ["#ff0000", "#00ff00", "#0000ff"] : null,
-        shareToken: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    }
-
-    // Extendable Hall: 6 frames (positions 9-14) alternating left-right
-    for (let i = 9; i < 15; i++) {
-      framesList.push({
-        id: `frame-${i}`,
-        museumId: "test-museum",
-        position: i,
-        side: (i - 9) % 2 === 0 ? "left" : "right",
-        imageUrl: i % 4 === 0 ? "test-image.jpg" : null,
-        description: i % 4 === 0 ? `Test frame ${i}` : null,
-        themeColors: i % 4 === 0 ? ["#ff0000", "#00ff00", "#0000ff"] : null,
-        shareToken: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    }
-
-    return framesList;
-  }, []);
-
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768 || "ontouchstart" in window);
@@ -116,9 +77,9 @@ export default function MuseumPage() {
   }, [userProfile, setShowTutorial]);
 
   // Initialize frames in store
-  useEffect(() => {
-    setFrames(testFrames);
-  }, [testFrames, setFrames]);
+  // useEffect(() => {
+  //   setFrames(testFrames);
+  // }, [testFrames, setFrames]);
 
   const handleCollisionBoundariesReady = useCallback(
     (boundaries: THREE.Box3[]) => {
@@ -181,6 +142,15 @@ export default function MuseumPage() {
     { enabled: !!currentMuseumId }
   );
 
+  // Fetch user's museums to select the first one by default
+  const { data: userMuseums } = trpc.museum.list.useQuery();
+
+  useEffect(() => {
+    if (userMuseums && userMuseums.length > 0 && !currentMuseumId) {
+      setCurrentMuseumId(userMuseums[0].id);
+    }
+  }, [userMuseums, currentMuseumId]);
+
   // Update store when museum data is loaded
   useEffect(() => {
     if (museumData) {
@@ -209,7 +179,7 @@ export default function MuseumPage() {
       >
         <MuseumLayout
           frames={
-            currentMuseumId && museumData ? museumData.frames : testFrames
+            currentMuseumId && museumData ? museumData.frames : []
           }
           onCollisionBoundariesReady={handleCollisionBoundariesReady}
           onFrameClick={handleFrameClick}

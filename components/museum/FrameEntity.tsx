@@ -166,6 +166,8 @@ const FrameMesh = React.forwardRef<
 
 FrameMesh.displayName = "FrameMesh";
 
+import { trpc } from "@/lib/trpc/client";
+
 // Image material component with texture loading
 function ImageMaterial({
   imageUrl,
@@ -175,18 +177,23 @@ function ImageMaterial({
   lod: "high" | "low";
 }) {
   const [textureUrl, setTextureUrl] = useState<string | null>(null);
+  
+  // Query to get signed URL if needed
+  const { data: signedUrlData } = trpc.image.getSignedUrl.useQuery(
+    { filename: imageUrl },
+    { 
+      enabled: !!imageUrl && !imageUrl.startsWith("http"),
+      staleTime: 1000 * 60 * 55, // Cache for 55 minutes (urls expire in 60)
+    }
+  );
 
   useEffect(() => {
-    // In a real implementation, we would:
-    // 1. Compress images to WebP format on upload
-    // 2. Generate multiple sizes (thumbnail, medium, full)
-    // 3. Load appropriate size based on LOD
-    
-    // For now, we'll use the original URL
-    // In production, this would be:
-    // const url = lod === "high" ? `${imageUrl}?size=full` : `${imageUrl}?size=medium`;
-    setTextureUrl(imageUrl);
-  }, [imageUrl, lod]);
+    if (imageUrl.startsWith("http")) {
+      setTextureUrl(imageUrl);
+    } else if (signedUrlData) {
+      setTextureUrl(signedUrlData.url);
+    }
+  }, [imageUrl, signedUrlData]);
 
   if (!textureUrl) {
     return <meshStandardMaterial color="#1a1a1a" />;

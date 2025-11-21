@@ -14,6 +14,8 @@ interface FrameInteractionModalProps {
 
 type ModalTab = "upload" | "camera" | "generate" | "details";
 
+import { FrameImagePreview } from "./FrameImagePreview";
+
 export function FrameInteractionModal({
   frame,
   onClose,
@@ -619,13 +621,10 @@ export function FrameInteractionModal({
             <div className="space-y-4">
               {/* Image preview */}
               {frame.imageUrl && (
-                <div className="relative bg-gray-100 rounded-lg overflow-hidden">
-                  <img
-                    src={frame.imageUrl}
-                    alt={frame.description || "Frame image"}
-                    className="w-full h-64 object-contain"
-                  />
-                </div>
+                <FrameImagePreview 
+                  imageUrl={frame.imageUrl} 
+                  description={frame.description || "Frame image"} 
+                />
               )}
 
               {/* Description */}

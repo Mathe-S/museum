@@ -31,7 +31,14 @@ function getBucket() {
         message: "Google Cloud Storage bucket not configured.",
       });
     }
-    bucket = getStorage().bucket(bucketName);
+    const storageInstance = getStorage();
+    if (!storageInstance) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Google Cloud Storage failed to initialize.",
+      });
+    }
+    bucket = storageInstance.bucket(bucketName);
   }
   return bucket;
 }
@@ -47,11 +54,13 @@ async function extractThemeColors(imageBuffer: Buffer): Promise<string[]> {
   try {
     // Use sharp to get image stats and extract colors
     const { dominant } = await sharp(imageBuffer).stats();
-    
+
     // Convert RGB to hex
     const toHex = (r: number, g: number, b: number) =>
-      `#${[r, g, b].map((x) => Math.round(x).toString(16).padStart(2, "0")).join("")}`;
-    
+      `#${[r, g, b]
+        .map((x) => Math.round(x).toString(16).padStart(2, "0"))
+        .join("")}`;
+
     // Return dominant color
     return [toHex(dominant.r, dominant.g, dominant.b)];
   } catch (error) {
@@ -107,7 +116,8 @@ export const imageRouter = createTRPCRouter({
       if (!SUPPORTED_MIME_TYPES.includes(input.contentType)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Unsupported file type. Only JPEG, PNG, and WebP are allowed.",
+          message:
+            "Unsupported file type. Only JPEG, PNG, and WebP are allowed.",
         });
       }
 
@@ -133,8 +143,8 @@ export const imageRouter = createTRPCRouter({
         // Generate multiple sizes
         const sizes = {
           thumbnail: { width: 256, height: 256 },
-          medium: { width: 1024, height: 1024 },
-          full: { width: 2048, height: 2048 },
+          // medium: { width: 1024, height: 1024 },
+          // full: { width: 2048, height: 2048 },
         };
 
         const uploadPromises: Promise<string>[] = [];
@@ -177,8 +187,8 @@ export const imageRouter = createTRPCRouter({
           imageId,
           urls: {
             thumbnail: urls.thumbnail,
-            medium: urls.medium,
-            full: urls.full,
+            medium: urls.thumbnail, // Cost saving: use thumbnail
+            full: urls.thumbnail, // Cost saving: use thumbnail
           },
           themeColors,
           metadata: {
@@ -254,7 +264,13 @@ export const imageRouter = createTRPCRouter({
       z.object({
         prompt: z.string().min(1).max(1000),
         style: z
-          .enum(["van-gogh", "impressionist", "realistic", "abstract", "watercolor"])
+          .enum([
+            "van-gogh",
+            "impressionist",
+            "realistic",
+            "abstract",
+            "watercolor",
+          ])
           .optional(),
       })
     )
@@ -276,8 +292,8 @@ export const imageRouter = createTRPCRouter({
         // Generate multiple sizes
         const sizes = {
           thumbnail: { width: 256, height: 256 },
-          medium: { width: 1024, height: 1024 },
-          full: { width: 2048, height: 2048 },
+          // medium: { width: 1024, height: 1024 },
+          // full: { width: 2048, height: 2048 },
         };
 
         const uploadPromises: Promise<string>[] = [];
@@ -320,8 +336,8 @@ export const imageRouter = createTRPCRouter({
           imageId,
           urls: {
             thumbnail: urls.thumbnail,
-            medium: urls.medium,
-            full: urls.full,
+            medium: urls.thumbnail, // Cost saving: use thumbnail
+            full: urls.thumbnail, // Cost saving: use thumbnail
           },
           themeColors,
           metadata: {
@@ -334,25 +350,30 @@ export const imageRouter = createTRPCRouter({
         };
       } catch (error) {
         console.error("Error generating image:", error);
-        
+
         // Handle specific error types
         if (error instanceof Error) {
           // Rate limit errors
           if (error.message.includes("Rate limit")) {
             throw new TRPCError({
               code: "TOO_MANY_REQUESTS",
-              message: "Rate limit exceeded. Please try again in a few moments.",
+              message:
+                "Rate limit exceeded. Please try again in a few moments.",
             });
           }
-          
+
           // Quota/permission errors
-          if (error.message.includes("quota") || error.message.includes("access denied")) {
+          if (
+            error.message.includes("quota") ||
+            error.message.includes("access denied")
+          ) {
             throw new TRPCError({
               code: "FORBIDDEN",
-              message: "API quota exceeded or access denied. Please contact support.",
+              message:
+                "API quota exceeded or access denied. Please contact support.",
             });
           }
-          
+
           // API configuration errors
           if (error.message.includes("not configured")) {
             throw new TRPCError({
@@ -361,7 +382,7 @@ export const imageRouter = createTRPCRouter({
             });
           }
         }
-        
+
         // Generic error
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
