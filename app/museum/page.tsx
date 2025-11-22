@@ -145,12 +145,9 @@ export default function MuseumPage() {
   // Pause navigation when profile overlay, modal, or tutorial is open
   useEffect(() => {
     setIsNavigationPaused(
-      showProfileOverlay ||
-        selectedFrame !== null ||
-        showMuseumSelector ||
-        showTutorial
+      showProfileOverlay || showMuseumSelector || showTutorial
     );
-  }, [showProfileOverlay, selectedFrame, showMuseumSelector, showTutorial]);
+  }, [showProfileOverlay, showMuseumSelector, showTutorial]);
 
   // Listen for portal zone entered event
   useEffect(() => {
@@ -215,8 +212,8 @@ export default function MuseumPage() {
       >
         <MuseumLayout
           frames={
-            currentMuseumId && museumData 
-              ? museumData.frames 
+            currentMuseumId && museumData
+              ? museumData.frames
               : placeholderFrames
           }
           onCollisionBoundariesReady={handleCollisionBoundariesReady}

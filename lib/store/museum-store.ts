@@ -40,6 +40,7 @@ interface MuseumStore {
 
   // UI state
   isLoading: boolean;
+  processingFrames: Record<string, "uploading" | "deleting">;
   selectedFrame: Frame | null;
   showProfileOverlay: boolean;
   showTutorial: boolean;
@@ -56,6 +57,10 @@ interface MuseumStore {
   setFrames: (frames: Frame[]) => void;
   updateFrame: (frame: Frame) => void;
   deleteFrame: (frameId: string) => void;
+  setFrameProcessing: (
+    frameId: string,
+    status: "uploading" | "deleting" | null
+  ) => void;
   toggleTheme: () => void;
   setSelectedFrame: (frame: Frame | null) => void;
   setShowProfileOverlay: (show: boolean) => void;
@@ -80,6 +85,7 @@ export const useMuseumStore = create<MuseumStore>((set) => ({
   currentMuseum: null,
   frames: [],
   isLoading: false,
+  processingFrames: {},
   selectedFrame: null,
   showProfileOverlay: false,
   showTutorial: false,
@@ -100,6 +106,16 @@ export const useMuseumStore = create<MuseumStore>((set) => ({
     set((state) => ({
       frames: state.frames.filter((f) => f.id !== frameId),
     })),
+  setFrameProcessing: (frameId, status) =>
+    set((state) => {
+      const newProcessing = { ...state.processingFrames };
+      if (status === null) {
+        delete newProcessing[frameId];
+      } else {
+        newProcessing[frameId] = status;
+      }
+      return { processingFrames: newProcessing };
+    }),
   toggleTheme: () =>
     set((state) => ({
       themeMode: state.themeMode === "day" ? "night" : "day",

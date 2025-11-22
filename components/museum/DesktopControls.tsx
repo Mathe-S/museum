@@ -40,6 +40,20 @@ export function DesktopControls({
       controls.lock();
     };
 
+    // Attempt to lock pointer immediately if enabled (may be blocked by browser without user gesture)
+    const timeout = setTimeout(() => {
+      // Only try if not already locked and if we have focus
+      if (document.hasFocus() && !controls.isLocked) {
+        try {
+          controls.lock();
+        } catch {
+          console.log(
+            "Auto-lock prevented by browser policy, waiting for click"
+          );
+        }
+      }
+    }, 1000);
+
     gl.domElement.addEventListener("click", handleCanvasClick);
 
     // Keyboard event listeners
@@ -66,6 +80,7 @@ export function DesktopControls({
 
     // Cleanup
     return () => {
+      clearTimeout(timeout);
       gl.domElement.removeEventListener("click", handleCanvasClick);
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("keyup", handleKeyUp);

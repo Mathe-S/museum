@@ -4,6 +4,8 @@ import React, { useRef, useState, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
+import { useMuseumStore } from "@/lib/store/museum-store";
+
 interface FrameEntityProps {
   id: string;
   position: THREE.Vector3;
@@ -25,6 +27,10 @@ export function FrameEntity({
   // Default to true so images try to load immediately. We rely on LOD/distance for unloading if needed.
   const [shouldLoadTexture, setShouldLoadTexture] = useState(true);
   const { camera } = useThree();
+
+  const processingFrames = useMuseumStore((state) => state.processingFrames);
+  const isProcessing =
+    processingFrames[id] === "uploading" || processingFrames[id] === "deleting";
 
   // Calculate distance from camera to determine LOD and lazy loading
   useFrame(() => {
@@ -95,10 +101,11 @@ export function FrameEntity({
         frameId={id}
         imageUrl={imageUrl}
         shouldLoadTexture={shouldLoadTexture}
+        isProcessing={isProcessing}
       />
 
       {/* Circle indicator when crosshair is on frame (only if empty) */}
-      {isHovered && !imageUrl && <CircleIndicator />}
+      {isHovered && !imageUrl && !isProcessing && <CircleIndicator />}
     </group>
   );
 }
@@ -110,8 +117,9 @@ const FrameMesh = React.forwardRef<
     frameId: string;
     imageUrl: string | null;
     shouldLoadTexture: boolean;
+    isProcessing: boolean;
   }
->(({ frameId, imageUrl, shouldLoadTexture }, ref) => {
+>(({ frameId, imageUrl, shouldLoadTexture, isProcessing }, ref) => {
   const { camera } = useThree();
   const [currentLOD, setCurrentLOD] = useState<"high" | "low">("high");
 
@@ -141,9 +149,20 @@ const FrameMesh = React.forwardRef<
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
 
-      {/* Image Plane */}
-      {imageUrl && shouldLoadTexture && (
-        <AsyncImage imageUrl={imageUrl} frameId={frameId} />
+      {/* Loading Spinner Overlay */}
+      {isProcessing && (
+        <group position={[0, 0, 0.15]}>
+          <LoadingSpinner />
+        </group>
+      )}
+
+      {/* Image Plane - Show if exists and not deleted, or if uploading (keep old image until new one ready if replace) */}
+      {imageUrl && shouldLoadTexture && !isProcessing && (
+        <AsyncImage
+          key={imageUrl} // Force remount when URL changes
+          imageUrl={imageUrl}
+          frameId={frameId}
+        />
       )}
     </>
   );
