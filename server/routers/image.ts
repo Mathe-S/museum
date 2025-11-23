@@ -272,14 +272,16 @@ export const imageRouter = createTRPCRouter({
             "watercolor",
           ])
           .optional(),
+        baseImage: z.string().optional(), // Base64 encoded image for style transfer
       })
     )
     .mutation(async ({ input }) => {
       try {
-        // Generate image using Google Imagen API
+        // Generate image using Gemini Image API
         const { imageData } = await generateImage({
           prompt: input.prompt,
           style: input.style,
+          baseImage: input.baseImage,
         });
 
         // Generate unique ID for this image set

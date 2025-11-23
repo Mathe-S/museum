@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useMemo } from "react";
+import * as THREE from "three";
 import { Frame } from "@/lib/store/museum-store";
 import { trpc } from "@/lib/trpc/client";
 import { useMuseumStore } from "@/lib/store/museum-store";
-import { X, Camera, Trash2, RefreshCcw, ChevronDown } from "lucide-react";
+import { X, Camera, Trash2, Upload, ChevronDown } from "lucide-react";
 
 interface FrameInteractionModalProps {
   frame: Frame | null;
@@ -22,6 +23,7 @@ export function FrameInteractionModal({
   isPublicView = false,
 }: FrameInteractionModalProps) {
   const [activeView, setActiveView] = useState<PanelView>("main");
+  const [showCamera, setShowCamera] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiStyle, setAiStyle] = useState<
     "van-gogh" | "impressionist" | "realistic" | "abstract" | "watercolor"
@@ -42,6 +44,7 @@ export function FrameInteractionModal({
   const frames = useMuseumStore((state) => state.frames);
   const setSelectedFrame = useMuseumStore((state) => state.setSelectedFrame);
   const processingFrames = useMuseumStore((state) => state.processingFrames);
+  const triggerRobber = useMuseumStore((state) => state.triggerRobber);
 
   const utils = trpc.useUtils();
 
@@ -101,13 +104,10 @@ export function FrameInteractionModal({
     };
   }, [stream]);
 
-  // Set initial description from frame
+  // Set initial description from frame only when frame changes
   useEffect(() => {
-    if (frame?.description !== description) {
-      // eslint-disable-next-line
-      setDescription(frame?.description || "");
-    }
-  }, [frame, description]);
+    setDescription(frame?.description || "");
+  }, [frame?.id]);
 
   // Effect to handle video stream setup
   useEffect(() => {
@@ -166,10 +166,11 @@ export function FrameInteractionModal({
   const stopCamera = () => {
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
+      setStream(null);
     }
     setIsCameraActive(false);
-    setStream(null);
-    setActiveView("main");
+    setIsVideoReady(false);
+    setShowCamera(false);
   };
 
   if (!frame) return null;
@@ -203,32 +204,69 @@ export function FrameInteractionModal({
         const base64Data = reader.result?.toString().split(",")[1];
         if (!base64Data) throw new Error("Failed to read file");
 
-        const uploadResult = await uploadMutation.mutateAsync({
-          filename: file.name,
-          contentType: file.type,
-          base64Data,
-        });
+        try {
+          // Check if AI generation is needed (non-realistic style)
+          if (aiStyle !== "realistic" && description.trim()) {
+            // Generate AI art using the uploaded image as base
+            const generateResult = await generateMutation.mutateAsync({
+              prompt: description,
+              style: aiStyle,
+              baseImage: base64Data,
+            });
 
-        const updatedFrame = await createFrameMutation.mutateAsync({
-          museumId: frame.museumId,
-          position: frame.position,
-          side: frame.side as "left" | "right" | null,
-          imageUrl: uploadResult.urls.full,
-          description: description || undefined,
-          themeColors: uploadResult.themeColors,
-        });
+            const updatedFrame = await createFrameMutation.mutateAsync({
+              museumId: frame.museumId,
+              position: frame.position,
+              side: frame.side as "left" | "right" | null,
+              imageUrl: generateResult.urls.full,
+              description: description,
+              themeColors: generateResult.themeColors,
+            });
 
-        updateFrame({
-          ...updatedFrame,
-          themeColors: updatedFrame.themeColors as string[] | null,
-        });
+            updateFrame({
+              ...updatedFrame,
+              themeColors: updatedFrame.themeColors as string[] | null,
+            });
 
-        await Promise.all([
-          utils.frame.listByMuseum.invalidate(),
-          utils.museum.getById.invalidate(),
-        ]);
+            await Promise.all([
+              utils.frame.listByMuseum.invalidate(),
+              utils.museum.getById.invalidate(),
+            ]);
 
-        setFrameProcessing(frame.id, null);
+            setFrameProcessing(frame.id, null);
+          } else {
+            // Regular upload without AI processing
+            const uploadResult = await uploadMutation.mutateAsync({
+              filename: file.name,
+              contentType: file.type,
+              base64Data,
+            });
+
+            const updatedFrame = await createFrameMutation.mutateAsync({
+              museumId: frame.museumId,
+              position: frame.position,
+              side: frame.side as "left" | "right" | null,
+              imageUrl: uploadResult.urls.full,
+              description: description || undefined,
+              themeColors: uploadResult.themeColors,
+            });
+
+            updateFrame({
+              ...updatedFrame,
+              themeColors: updatedFrame.themeColors as string[] | null,
+            });
+
+            await Promise.all([
+              utils.frame.listByMuseum.invalidate(),
+              utils.museum.getById.invalidate(),
+            ]);
+
+            setFrameProcessing(frame.id, null);
+          }
+        } catch (uploadError) {
+          console.error("Upload/generation error:", uploadError);
+          setFrameProcessing(frame.id, null);
+        }
       };
       reader.onerror = () => {
         console.error("Failed to read file");
@@ -243,21 +281,15 @@ export function FrameInteractionModal({
   // Camera capture handlers
   const startCamera = async () => {
     try {
-      setActiveView("camera");
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
       });
-      setStream(mediaStream);
+      setStream(stream);
       setIsCameraActive(true);
-      setError(null);
+      setShowCamera(true);
     } catch (err) {
       console.error("Camera error:", err);
       setError("Failed to access camera. Please check permissions.");
-      setActiveView("main");
     }
   };
 
@@ -297,39 +329,84 @@ export function FrameInteractionModal({
       setFrameProcessing(frame.id, "uploading");
 
       try {
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        reader.onload = async () => {
-          const base64Data = reader.result?.toString().split(",")[1];
-          if (!base64Data) throw new Error("Failed to process photo");
+        // Check if AI generation is needed (non-realistic style)
+        if (aiStyle !== "realistic" && description.trim()) {
+          // Read the captured photo as base64 for style transfer
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onload = async () => {
+            const base64Data = reader.result?.toString().split(",")[1];
+            if (!base64Data) throw new Error("Failed to process photo");
 
-          const uploadResult = await uploadMutation.mutateAsync({
-            filename: `camera-${Date.now()}.jpg`,
-            contentType: "image/jpeg",
-            base64Data,
-          });
+            try {
+              // Generate AI art using the photo as base and applying the style
+              const generateResult = await generateMutation.mutateAsync({
+                prompt: description,
+                style: aiStyle,
+                baseImage: base64Data,
+              });
 
-          const updatedFrame = await createFrameMutation.mutateAsync({
-            museumId: frame.museumId,
-            position: frame.position,
-            side: frame.side as "left" | "right" | null,
-            imageUrl: uploadResult.urls.full,
-            description: description || undefined,
-            themeColors: uploadResult.themeColors,
-          });
+              const updatedFrame = await createFrameMutation.mutateAsync({
+                museumId: frame.museumId,
+                position: frame.position,
+                side: frame.side as "left" | "right" | null,
+                imageUrl: generateResult.urls.full,
+                description: description,
+                themeColors: generateResult.themeColors,
+              });
 
-          updateFrame({
-            ...updatedFrame,
-            themeColors: updatedFrame.themeColors as string[] | null,
-          });
+              updateFrame({
+                ...updatedFrame,
+                themeColors: updatedFrame.themeColors as string[] | null,
+              });
 
-          await Promise.all([
-            utils.frame.listByMuseum.invalidate(),
-            utils.museum.getById.invalidate(),
-          ]);
+              await Promise.all([
+                utils.frame.listByMuseum.invalidate(),
+                utils.museum.getById.invalidate(),
+              ]);
 
-          setFrameProcessing(frame.id, null);
-        };
+              setFrameProcessing(frame.id, null);
+            } catch (err) {
+              console.error("AI generation error:", err);
+              setFrameProcessing(frame.id, null);
+            }
+          };
+        } else {
+          // Regular photo upload
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onload = async () => {
+            const base64Data = reader.result?.toString().split(",")[1];
+            if (!base64Data) throw new Error("Failed to process photo");
+
+            const uploadResult = await uploadMutation.mutateAsync({
+              filename: `camera-${Date.now()}.jpg`,
+              contentType: "image/jpeg",
+              base64Data,
+            });
+
+            const updatedFrame = await createFrameMutation.mutateAsync({
+              museumId: frame.museumId,
+              position: frame.position,
+              side: frame.side as "left" | "right" | null,
+              imageUrl: uploadResult.urls.full,
+              description: description || undefined,
+              themeColors: uploadResult.themeColors,
+            });
+
+            updateFrame({
+              ...updatedFrame,
+              themeColors: updatedFrame.themeColors as string[] | null,
+            });
+
+            await Promise.all([
+              utils.frame.listByMuseum.invalidate(),
+              utils.museum.getById.invalidate(),
+            ]);
+
+            setFrameProcessing(frame.id, null);
+          };
+        }
       } catch (err) {
         console.error("Capture error:", err);
         setFrameProcessing(frame.id, null);
@@ -376,33 +453,95 @@ export function FrameInteractionModal({
     }
   };
 
+  // Calculate robber's position in front of the frame in museum space
+  const calculateRobberPosition = (
+    position: number,
+    side: string | null
+  ): [number, number, number] => {
+    const MAIN_HALL_WIDTH = 40;
+    const MAIN_HALL_DEPTH = 30;
+    const FRAME_HEIGHT = 5;
+    const HALL_SEGMENT_LENGTH = 8;
+    const HALL_WIDTH = 10;
+    const ROBBER_OFFSET = 2.5; // Distance in front of the frame
+
+    // Front entrance wall: positions 0-2 (frames face inward, toward museum)
+    if (position >= 0 && position < 3) {
+      const x = (position - 1) * 10;
+      const y = FRAME_HEIGHT - 1; // Lower robber slightly
+      const z = -0.3 - ROBBER_OFFSET; // In front toward the museum interior
+      return [x, y, z];
+    }
+
+    // Left wall: positions 3-5 (frames face right, toward center)
+    if (position >= 3 && position < 6) {
+      const wallIndex = position - 3;
+      const x = -MAIN_HALL_WIDTH / 2 + 0.3 + ROBBER_OFFSET; // To the right of frame
+      const y = FRAME_HEIGHT - 1;
+      const z = -(wallIndex * 10 + 5);
+      return [x, y, z];
+    }
+
+    // Right wall: positions 6-8 (frames face left, toward center)
+    if (position >= 6 && position < 9) {
+      const wallIndex = position - 6;
+      const x = MAIN_HALL_WIDTH / 2 - 0.3 - ROBBER_OFFSET; // To the left of frame
+      const y = FRAME_HEIGHT - 1;
+      const z = -(wallIndex * 10 + 5);
+      return [x, y, z];
+    }
+
+    // Extendable hall: positions 9+ (alternating left/right)
+    const extendableIndex = position - 9;
+    const segmentIndex = Math.floor(extendableIndex / 2);
+    const isLeft = side === "left";
+    const x = isLeft
+      ? -HALL_WIDTH / 2 + 0.3 + ROBBER_OFFSET // Left frames face right
+      : HALL_WIDTH / 2 - 0.3 - ROBBER_OFFSET; // Right frames face left
+    const y = 4 - 1; // Lower robber slightly
+    const z = -MAIN_HALL_DEPTH - HALL_SEGMENT_LENGTH * (segmentIndex + 0.5);
+    return [x, y, z];
+  };
+
   const handleDelete = async () => {
     if (!frame) return;
 
-    // Close modal immediately and start processing
+    // Close modal
     handleClose();
+
+    // Calculate robber's position in front of the frame
+    const [x, y, z] = calculateRobberPosition(frame.position, frame.side);
+    const robberPosition = new THREE.Vector3(x, y, z);
+
+    // Trigger robber animation
+    triggerRobber(frame.id, robberPosition);
+
+    // Set to deleting state immediately
     setFrameProcessing(frame.id, "deleting");
 
-    try {
-      const updatedFrame = await deleteFrameMutation.mutateAsync({
-        id: frame.id,
-      });
+    // Wait for animation to complete (4 seconds)
+    setTimeout(async () => {
+      try {
+        const updatedFrame = await deleteFrameMutation.mutateAsync({
+          id: frame.id,
+        });
 
-      updateFrame({
-        ...updatedFrame,
-        themeColors: updatedFrame.themeColors as string[] | null,
-      });
+        updateFrame({
+          ...updatedFrame,
+          themeColors: updatedFrame.themeColors as string[] | null,
+        });
 
-      await Promise.all([
-        utils.frame.listByMuseum.invalidate(),
-        utils.museum.getById.invalidate(),
-      ]);
+        await Promise.all([
+          utils.frame.listByMuseum.invalidate(),
+          utils.museum.getById.invalidate(),
+        ]);
 
-      setFrameProcessing(frame.id, null);
-    } catch (err) {
-      console.error("Delete error:", err);
-      setFrameProcessing(frame.id, null);
-    }
+        setFrameProcessing(frame.id, null);
+      } catch (err) {
+        console.error("Delete error:", err);
+        setFrameProcessing(frame.id, null);
+      }
+    }, 4000);
   };
 
   return (
@@ -538,9 +677,9 @@ export function FrameInteractionModal({
                       <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={processingFrames[frame.id] === "uploading"}
-                        className="w-full py-2.5 bg-[#8B5E3C] hover:bg-[#724C31] active:bg-[#5E3E28] text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+                        className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors"
                       >
-                        <RefreshCcw className="w-4 h-4" />
+                        <Upload className="w-4 h-4" />
                         {processingFrames[frame.id] === "uploading"
                           ? "Uploading..."
                           : isEmpty
@@ -550,13 +689,23 @@ export function FrameInteractionModal({
                     </div>
 
                     {/* Take Photo */}
-                    <button
-                      onClick={startCamera}
-                      className="w-full py-2.5 bg-[#5B7CFA] hover:bg-[#4A69D8] active:bg-[#3D58B8] text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors"
-                    >
-                      <Camera className="w-4 h-4" />
-                      Take Photo
-                    </button>
+                    {!showCamera ? (
+                      <button
+                        onClick={startCamera}
+                        className="w-full py-2.5 bg-[#5B7CFA] hover:bg-[#4A69D8] active:bg-[#3D58B8] text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Camera className="w-4 h-4" />
+                        Take Photo
+                      </button>
+                    ) : (
+                      <button
+                        onClick={stopCamera}
+                        className="w-full py-2.5 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                        Close Camera
+                      </button>
+                    )}
 
                     {/* Generate with AI */}
                     <button
@@ -581,6 +730,40 @@ export function FrameInteractionModal({
                       </button>
                     )}
                   </div>
+
+                  {/* Camera View - Inline */}
+                  {showCamera && (
+                    <div className="space-y-3">
+                      <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+                        {!isVideoReady && (
+                          <div className="absolute inset-0 flex items-center justify-center text-white">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                          </div>
+                        )}
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+                        <canvas ref={canvasRef} className="hidden" />
+                      </div>
+
+                      <button
+                        onClick={capturePhoto}
+                        disabled={
+                          processingFrames[frame.id] === "uploading" ||
+                          !isVideoReady
+                        }
+                        className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {processingFrames[frame.id] === "uploading"
+                          ? "Processing..."
+                          : "Capture Photo"}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Status Bar */}
                   <div className="mt-4 pt-4 border-t border-gray-100">

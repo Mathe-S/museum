@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import * as THREE from "three";
 
 // Types
 export interface Museum {
@@ -48,6 +49,9 @@ interface MuseumStore {
   moveSpeed: number;
   shouldResetCamera: boolean;
 
+  // Robber animation state
+  robberTarget: { frameId: string; position: THREE.Vector3 } | null;
+
   // Multiplayer state
   visitors: Map<string, Visitor>;
   visitorCount: number;
@@ -68,6 +72,10 @@ interface MuseumStore {
   setIsLoading: (loading: boolean) => void;
   setMoveSpeed: (speed: number) => void;
   setShouldResetCamera: (reset: boolean) => void;
+
+  // Robber actions
+  triggerRobber: (frameId: string, position: THREE.Vector3) => void;
+  clearRobber: () => void;
 
   // Multiplayer actions
   addVisitor: (visitor: Visitor) => void;
@@ -92,6 +100,7 @@ export const useMuseumStore = create<MuseumStore>((set) => ({
   themeMode: "day",
   moveSpeed: 10.0, // Increased from 5.0 to 10.0 for faster movement
   shouldResetCamera: false,
+  robberTarget: null,
   visitors: new Map(),
   visitorCount: 0,
 
@@ -126,6 +135,11 @@ export const useMuseumStore = create<MuseumStore>((set) => ({
   setIsLoading: (loading) => set({ isLoading: loading }),
   setMoveSpeed: (speed) => set({ moveSpeed: speed }),
   setShouldResetCamera: (reset) => set({ shouldResetCamera: reset }),
+
+  // Robber actions
+  triggerRobber: (frameId, position) =>
+    set({ robberTarget: { frameId, position } }),
+  clearRobber: () => set({ robberTarget: null }),
 
   // Multiplayer actions
   addVisitor: (visitor) =>

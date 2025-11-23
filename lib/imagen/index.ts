@@ -1,13 +1,14 @@
-// Google Imagen API client configuration
-// Uses Google's Vertex AI Imagen API for AI-powered image generation
+// Google Gemini Image API client configuration
+// Uses Google's Gemini 2.5 Flash Image model for AI-powered image generation
 
-if (!process.env.GOOGLE_IMAGEN_API_KEY) {
-  console.warn("GOOGLE_IMAGEN_API_KEY environment variable is not set");
+if (!process.env.GEMINI_API_KEY) {
+  console.warn("GEMINI_API_KEY environment variable is not set");
 }
 
 export interface ImageGenerationParams {
   prompt: string;
   style?: string;
+  baseImage?: string; // base64 encoded image for style transfer
 }
 
 export interface ImageGenerationResult {
@@ -16,11 +17,13 @@ export interface ImageGenerationResult {
 
 // Style preset mappings to Imagen parameters
 const STYLE_PRESETS: Record<string, string> = {
-  "van-gogh": "in the style of Vincent van Gogh, post-impressionist painting with bold brushstrokes and vibrant colors",
-  "impressionist": "impressionist painting style with soft brushwork, light effects, and vivid colors",
-  "realistic": "photorealistic, highly detailed",
-  "abstract": "abstract art style with geometric shapes and bold colors",
-  "watercolor": "watercolor painting style with soft washes and delicate details",
+  "van-gogh":
+    "in the style of Vincent van Gogh, post-impressionist painting with bold brushstrokes and vibrant colors",
+  impressionist:
+    "impressionist painting style with soft brushwork, light effects, and vivid colors",
+  realistic: "photorealistic, highly detailed",
+  abstract: "abstract art style with geometric shapes and bold colors",
+  watercolor: "watercolor painting style with soft washes and delicate details",
 };
 
 /**
@@ -31,47 +34,72 @@ const STYLE_PRESETS: Record<string, string> = {
 export async function generateImage(
   params: ImageGenerationParams
 ): Promise<ImageGenerationResult> {
-  const apiKey = process.env.GOOGLE_IMAGEN_API_KEY;
-  
+  const apiKey = process.env.GEMINI_API_KEY;
+
   if (!apiKey) {
-    throw new Error("GOOGLE_IMAGEN_API_KEY is not configured");
+    throw new Error("GEMINI_API_KEY is not configured");
   }
 
   // Build the full prompt with style if provided
   let fullPrompt = params.prompt;
-  if (params.style && STYLE_PRESETS[params.style]) {
-    fullPrompt = `${params.prompt}, ${STYLE_PRESETS[params.style]}`;
+  if (params.baseImage) {
+    // For image-to-image: explicitly instruct to use the provided image
+    if (params.style && STYLE_PRESETS[params.style]) {
+      fullPrompt = `Transform this image: ${params.prompt}, apply ${
+        STYLE_PRESETS[params.style]
+      }. Keep the main subject and composition from the original image.`;
+    } else {
+      fullPrompt = `Transform this image based on: ${params.prompt}. Keep the main elements from the original image.`;
+    }
+  } else {
+    // For text-to-image: use style preset normally
+    if (params.style && STYLE_PRESETS[params.style]) {
+      fullPrompt = `${params.prompt}, ${STYLE_PRESETS[params.style]}`;
+    }
   }
 
   try {
-    // Google Vertex AI Imagen API endpoint
-    const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
-    const location = "us-central1"; // Default location for Imagen
-    
-    if (!projectId) {
-      throw new Error("GOOGLE_CLOUD_PROJECT_ID is not configured");
+    // Gemini API endpoint for image generation
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`;
+
+    // Build requestParts array - include base image if provided for style transfer
+    const requestParts: Array<{
+      text?: string;
+      inlineData?: { mimeType: string; data: string };
+    }> = [];
+
+    if (params.baseImage) {
+      // For image-to-image, add the base image first
+      requestParts.push({
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: params.baseImage,
+        },
+      });
     }
 
-    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/imagegeneration@006:predict`;
+    // Add the text prompt
+    requestParts.push({ text: fullPrompt });
 
     const requestBody = {
-      instances: [
+      contents: [
         {
-          prompt: fullPrompt,
+          parts: requestParts,
         },
       ],
-      parameters: {
-        sampleCount: 1,
-        aspectRatio: "1:1", // Square images for frames
-        safetyFilterLevel: "block_some",
-        personGeneration: "allow_adult",
+      generationConfig: {
+        responseModalities: ["IMAGE"],
+        // Use 1:1 aspect ratio (default) for smaller, more cost-effective images
+        imageConfig: {
+          aspectRatio: "1:1",
+        },
       },
     };
 
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "x-goog-api-key": apiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(requestBody),
@@ -79,34 +107,41 @@ export async function generateImage(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Imagen API error:", errorText);
-      
+      console.error("Gemini API error:", errorText);
+
       // Handle rate limiting
       if (response.status === 429) {
         throw new Error("Rate limit exceeded. Please try again later.");
       }
-      
+
       // Handle quota errors
       if (response.status === 403) {
-        throw new Error("API quota exceeded or access denied. Please check your API configuration.");
+        throw new Error(
+          "API quota exceeded or access denied. Please check your API configuration."
+        );
       }
-      
+
       throw new Error(`Image generation failed: ${response.statusText}`);
     }
 
     const result = await response.json();
-    
-    // Extract the base64 image data from the response
-    if (!result.predictions || result.predictions.length === 0) {
+
+    // Extract the base64 image data from Gemini response
+    if (!result.candidates || result.candidates.length === 0) {
       throw new Error("No image generated");
     }
 
-    const prediction = result.predictions[0];
-    const base64Image = prediction.bytesBase64Encoded || prediction.image?.bytesBase64Encoded;
-    
-    if (!base64Image) {
+    const candidate = result.candidates[0];
+    const parts = candidate.content?.parts || [];
+
+    // Find the part with inline image data
+    const imagePart = parts.find((part: any) => part.inlineData);
+
+    if (!imagePart || !imagePart.inlineData || !imagePart.inlineData.data) {
       throw new Error("No image data in response");
     }
+
+    const base64Image = imagePart.inlineData.data;
 
     // Convert base64 to buffer
     const imageData = Buffer.from(base64Image, "base64");
@@ -116,12 +151,12 @@ export async function generateImage(
     };
   } catch (error) {
     console.error("Error generating image with Imagen:", error);
-    
+
     // Re-throw with more context
     if (error instanceof Error) {
       throw error;
     }
-    
+
     throw new Error("Failed to generate image");
   }
 }

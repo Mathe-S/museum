@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { FrameEntity } from "./FrameEntity";
 import { PortalSystem } from "./PortalSystem";
+import { RobberCharacter3D } from "./RobberCharacter3D";
+import { useMuseumStore } from "@/lib/store/museum-store";
 
 interface Frame {
   id: string;
@@ -21,7 +23,17 @@ interface MuseumLayoutProps {
   isPublicView?: boolean;
 }
 
-export function MuseumLayout({ frames, onCollisionBoundariesReady, onFrameClick, onMuseumSwitch, onNavigationPause, isPublicView = false }: MuseumLayoutProps) {
+export function MuseumLayout({
+  frames,
+  onCollisionBoundariesReady,
+  onFrameClick,
+  onMuseumSwitch,
+  onNavigationPause,
+  isPublicView = false,
+}: MuseumLayoutProps) {
+  const robberTarget = useMuseumStore((state) => state.robberTarget);
+  const clearRobber = useMuseumStore((state) => state.clearRobber);
+
   const { mainHallGeometry, extendableHallGeometry, collisionBoundaries } =
     useMemo(() => {
       const geometry = generateMuseumGeometry(frames);
@@ -43,10 +55,22 @@ export function MuseumLayout({ frames, onCollisionBoundariesReady, onFrameClick,
       {/* Frame Positions */}
       <FramePositions frames={frames} onFrameClick={onFrameClick} />
 
+      {/* Robber Character - appears when deleting */}
+      {robberTarget && (
+        <RobberCharacter3D
+          position={[
+            robberTarget.position.x,
+            robberTarget.position.y,
+            robberTarget.position.z,
+          ]}
+          onComplete={clearRobber}
+        />
+      )}
+
       {/* Portal System at end of Extendable Hall - disabled for public view */}
       {!isPublicView && (
-        <PortalSystem 
-          position={extendableHallGeometry.portalPosition} 
+        <PortalSystem
+          position={extendableHallGeometry.portalPosition}
           onMuseumSwitch={onMuseumSwitch}
           onNavigationPause={onNavigationPause}
         />
@@ -129,7 +153,7 @@ function generateCollisionBoundaries(
       new THREE.Vector3(-5, height, -depth)
     )
   );
-  
+
   // Right segment of back wall
   boundaries.push(
     new THREE.Box3(
@@ -171,7 +195,11 @@ function generateCollisionBoundaries(
   boundaries.push(
     new THREE.Box3(
       new THREE.Vector3(hallHalfWidth, 0, hallEnd),
-      new THREE.Vector3(hallHalfWidth + wallThickness, extendableHall.height, hallStart)
+      new THREE.Vector3(
+        hallHalfWidth + wallThickness,
+        extendableHall.height,
+        hallStart
+      )
     )
   );
 
@@ -213,25 +241,41 @@ function MainHall({ geometry }: { geometry: any }) {
 
       {/* Back wall with opening for corridor */}
       {/* Left segment of back wall */}
-      <mesh position={[-width / 4 - 2.5, height / 2, -depth]} receiveShadow castShadow>
+      <mesh
+        position={[-width / 4 - 2.5, height / 2, -depth]}
+        receiveShadow
+        castShadow
+      >
         <boxGeometry args={[width / 2 - 5, height, wallThickness]} />
         <meshStandardMaterial color="#e8e8e8" />
       </mesh>
-      
+
       {/* Right segment of back wall */}
-      <mesh position={[width / 4 + 2.5, height / 2, -depth]} receiveShadow castShadow>
+      <mesh
+        position={[width / 4 + 2.5, height / 2, -depth]}
+        receiveShadow
+        castShadow
+      >
         <boxGeometry args={[width / 2 - 5, height, wallThickness]} />
         <meshStandardMaterial color="#e8e8e8" />
       </mesh>
 
       {/* Left wall */}
-      <mesh position={[-width / 2, height / 2, -depth / 2]} receiveShadow castShadow>
+      <mesh
+        position={[-width / 2, height / 2, -depth / 2]}
+        receiveShadow
+        castShadow
+      >
         <boxGeometry args={[wallThickness, height, depth]} />
         <meshStandardMaterial color="#e8e8e8" />
       </mesh>
 
       {/* Right wall */}
-      <mesh position={[width / 2, height / 2, -depth / 2]} receiveShadow castShadow>
+      <mesh
+        position={[width / 2, height / 2, -depth / 2]}
+        receiveShadow
+        castShadow
+      >
         <boxGeometry args={[wallThickness, height, depth]} />
         <meshStandardMaterial color="#e8e8e8" />
       </mesh>
@@ -245,18 +289,24 @@ function MainHall({ geometry }: { geometry: any }) {
 // Optimized Plant Decorations Component
 function PlantDecorations({ width, depth }: { width: number; depth: number }) {
   // Shared geometries for performance (instancing)
-  const potGeometry = useMemo(() => new THREE.CylinderGeometry(0.8, 0.6, 1, 8), []);
+  const potGeometry = useMemo(
+    () => new THREE.CylinderGeometry(0.8, 0.6, 1, 8),
+    []
+  );
   const leafGeometry = useMemo(() => new THREE.SphereGeometry(1.2, 8, 8), []);
-  
+
   // Plant positions - strategically placed to not block movement or frame views
-  const plantPositions = useMemo(() => [
-    // Front corners - further from walls
-    { x: -width / 2 + 5, z: -3 },
-    { x: width / 2 - 5, z: -3 },
-    // Back corners (near corridor entrance) - further from walls
-    { x: -width / 2 + 5, z: -depth + 5 },
-    { x: width / 2 - 5, z: -depth + 5 },
-  ], [width, depth]);
+  const plantPositions = useMemo(
+    () => [
+      // Front corners - further from walls
+      { x: -width / 2 + 5, z: -3 },
+      { x: width / 2 - 5, z: -3 },
+      // Back corners (near corridor entrance) - further from walls
+      { x: -width / 2 + 5, z: -depth + 5 },
+      { x: width / 2 - 5, z: -depth + 5 },
+    ],
+    [width, depth]
+  );
 
   return (
     <group>
@@ -277,11 +327,19 @@ function PlantDecorations({ width, depth }: { width: number; depth: number }) {
 }
 
 // Glass Pyramid Roof component (Louvre style)
-function GlassPyramidRoof({ width, depth, height }: { width: number; depth: number; height: number }) {
+function GlassPyramidRoof({
+  width,
+  depth,
+  height,
+}: {
+  width: number;
+  depth: number;
+  height: number;
+}) {
   const pyramidHeight = 6;
   const baseY = height;
   const apexY = baseY + pyramidHeight;
-  
+
   // Calculate pyramid vertices
   const halfWidth = width / 2;
   const halfDepth = depth / 2;
@@ -290,11 +348,17 @@ function GlassPyramidRoof({ width, depth, height }: { width: number; depth: numb
   const frontGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
     const vertices = new Float32Array([
-      -halfWidth, baseY, 0,
-      halfWidth, baseY, 0,
-      0, apexY, -halfDepth,
+      -halfWidth,
+      baseY,
+      0,
+      halfWidth,
+      baseY,
+      0,
+      0,
+      apexY,
+      -halfDepth,
     ]);
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
     geometry.computeVertexNormals();
     return geometry;
   }, [halfWidth, baseY, apexY, halfDepth]);
@@ -302,11 +366,17 @@ function GlassPyramidRoof({ width, depth, height }: { width: number; depth: numb
   const rightGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
     const vertices = new Float32Array([
-      halfWidth, baseY, 0,
-      halfWidth, baseY, -depth,
-      0, apexY, -halfDepth,
+      halfWidth,
+      baseY,
+      0,
+      halfWidth,
+      baseY,
+      -depth,
+      0,
+      apexY,
+      -halfDepth,
     ]);
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
     geometry.computeVertexNormals();
     return geometry;
   }, [halfWidth, baseY, depth, apexY, halfDepth]);
@@ -314,11 +384,17 @@ function GlassPyramidRoof({ width, depth, height }: { width: number; depth: numb
   const backGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
     const vertices = new Float32Array([
-      halfWidth, baseY, -depth,
-      -halfWidth, baseY, -depth,
-      0, apexY, -halfDepth,
+      halfWidth,
+      baseY,
+      -depth,
+      -halfWidth,
+      baseY,
+      -depth,
+      0,
+      apexY,
+      -halfDepth,
     ]);
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
     geometry.computeVertexNormals();
     return geometry;
   }, [halfWidth, baseY, depth, apexY, halfDepth]);
@@ -326,11 +402,17 @@ function GlassPyramidRoof({ width, depth, height }: { width: number; depth: numb
   const leftGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
     const vertices = new Float32Array([
-      -halfWidth, baseY, -depth,
-      -halfWidth, baseY, 0,
-      0, apexY, -halfDepth,
+      -halfWidth,
+      baseY,
+      -depth,
+      -halfWidth,
+      baseY,
+      0,
+      0,
+      apexY,
+      -halfDepth,
     ]);
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
     geometry.computeVertexNormals();
     return geometry;
   }, [halfWidth, baseY, depth, apexY, halfDepth]);
@@ -339,25 +421,57 @@ function GlassPyramidRoof({ width, depth, height }: { width: number; depth: numb
     const geometry = new THREE.BufferGeometry();
     const vertices = new Float32Array([
       // Base edges
-      -halfWidth, baseY, 0,
-      halfWidth, baseY, 0,
-      halfWidth, baseY, 0,
-      halfWidth, baseY, -depth,
-      halfWidth, baseY, -depth,
-      -halfWidth, baseY, -depth,
-      -halfWidth, baseY, -depth,
-      -halfWidth, baseY, 0,
+      -halfWidth,
+      baseY,
+      0,
+      halfWidth,
+      baseY,
+      0,
+      halfWidth,
+      baseY,
+      0,
+      halfWidth,
+      baseY,
+      -depth,
+      halfWidth,
+      baseY,
+      -depth,
+      -halfWidth,
+      baseY,
+      -depth,
+      -halfWidth,
+      baseY,
+      -depth,
+      -halfWidth,
+      baseY,
+      0,
       // Edges to apex
-      -halfWidth, baseY, 0,
-      0, apexY, -halfDepth,
-      halfWidth, baseY, 0,
-      0, apexY, -halfDepth,
-      halfWidth, baseY, -depth,
-      0, apexY, -halfDepth,
-      -halfWidth, baseY, -depth,
-      0, apexY, -halfDepth,
+      -halfWidth,
+      baseY,
+      0,
+      0,
+      apexY,
+      -halfDepth,
+      halfWidth,
+      baseY,
+      0,
+      0,
+      apexY,
+      -halfDepth,
+      halfWidth,
+      baseY,
+      -depth,
+      0,
+      apexY,
+      -halfDepth,
+      -halfWidth,
+      baseY,
+      -depth,
+      0,
+      apexY,
+      -halfDepth,
     ]);
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
     return geometry;
   }, [halfWidth, baseY, depth, apexY, halfDepth]);
 
@@ -496,7 +610,13 @@ function ExtendableHall({ geometry }: { geometry: any }) {
 }
 
 // Frame Positions component
-function FramePositions({ frames, onFrameClick }: { frames: Frame[]; onFrameClick?: (frameId: string) => void }) {
+function FramePositions({
+  frames,
+  onFrameClick,
+}: {
+  frames: Frame[];
+  onFrameClick?: (frameId: string) => void;
+}) {
   const framePositions = useMemo(() => {
     return calculateFramePositions(frames);
   }, [frames]);
@@ -587,7 +707,9 @@ export function calculateFramePositions(frames: Frame[]) {
   // Extendable Hall: alternating left-right (positions 9+)
   const HALL_SEGMENT_LENGTH = 8;
   const HALL_WIDTH = 10;
-  const extendableFrames = frames.filter((f) => f.position >= 9).sort((a, b) => a.position - b.position);
+  const extendableFrames = frames
+    .filter((f) => f.position >= 9)
+    .sort((a, b) => a.position - b.position);
 
   extendableFrames.forEach((frame, index) => {
     const segmentIndex = Math.floor(index / 2);
@@ -609,10 +731,6 @@ export function calculateFramePositions(frames: Frame[]) {
 
   return positions;
 }
-
-
-
-
 
 // Collision boundaries (invisible helper)
 function CollisionBoundaries({ boundaries }: { boundaries: THREE.Box3[] }) {

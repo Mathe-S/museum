@@ -31,6 +31,7 @@ export function FrameEntity({
   const processingFrames = useMuseumStore((state) => state.processingFrames);
   const isProcessing =
     processingFrames[id] === "uploading" || processingFrames[id] === "deleting";
+  const isDeleting = processingFrames[id] === "deleting";
 
   // Calculate distance from camera to determine LOD and lazy loading
   useFrame(() => {
@@ -102,6 +103,7 @@ export function FrameEntity({
         imageUrl={imageUrl}
         shouldLoadTexture={shouldLoadTexture}
         isProcessing={isProcessing}
+        isDeleting={isDeleting}
       />
 
       {/* Circle indicator when crosshair is on frame (only if empty) */}
@@ -118,8 +120,9 @@ const FrameMesh = React.forwardRef<
     imageUrl: string | null;
     shouldLoadTexture: boolean;
     isProcessing: boolean;
+    isDeleting: boolean;
   }
->(({ frameId, imageUrl, shouldLoadTexture, isProcessing }, ref) => {
+>(({ frameId, imageUrl, shouldLoadTexture, isProcessing, isDeleting }, ref) => {
   const { camera } = useThree();
   const [currentLOD, setCurrentLOD] = useState<"high" | "low">("high");
 
@@ -149,8 +152,8 @@ const FrameMesh = React.forwardRef<
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
 
-      {/* Loading Spinner Overlay */}
-      {isProcessing && (
+      {/* Loading Spinner Overlay when uploading */}
+      {isProcessing && !isDeleting && (
         <group position={[0, 0, 0.15]}>
           <LoadingSpinner />
         </group>
