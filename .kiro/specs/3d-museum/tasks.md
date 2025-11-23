@@ -248,7 +248,7 @@
   - Allow guest visitor to navigate freely after spawning
   - _Requirements: 13.3, 13.4_
 
-- [ ] 23. Set up Partykit server for multiplayer
+- [x] 23. Set up Partykit server for multiplayer
 
   - Create Partykit server file at `/party/museum.ts`
   - Implement connection handler to add visitors to presence map
