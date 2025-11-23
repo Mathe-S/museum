@@ -240,7 +240,7 @@
   - Show view-only details when guests click frames
   - _Requirements: 12.4, 12.5, 14.1, 14.2, 14.3, 14.4_
 
-- [ ] 22. Implement frame-specific sharing
+- [x] 22. Implement frame-specific sharing
 
   - Create frame share page at `/frame/[shareToken]`
   - Fetch frame and museum data using `public.getFrameByShareToken` query

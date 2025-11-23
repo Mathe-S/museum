@@ -188,11 +188,22 @@ function AsyncImage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  // Query to get signed URL if needed
-  const { data: signedUrlData } = trpc.image.getSignedUrl.useQuery(
+  // Try public endpoint first (for shared museums/frames)
+  const { data: publicSignedUrlData } = trpc.public.getImageSignedUrl.useQuery(
     { filename: imageUrl },
     {
       enabled: !!imageUrl && !imageUrl.startsWith("http"),
+      staleTime: 1000 * 60 * 55, // Cache for 55 minutes
+      retry: false, // Don't retry if it fails
+    }
+  );
+
+  // Fallback to protected endpoint (for authenticated users)
+  const { data: protectedSignedUrlData } = trpc.image.getSignedUrl.useQuery(
+    { filename: imageUrl },
+    {
+      enabled:
+        !!imageUrl && !imageUrl.startsWith("http") && !publicSignedUrlData,
       staleTime: 1000 * 60 * 55, // Cache for 55 minutes
     }
   );
@@ -201,10 +212,12 @@ function AsyncImage({
   useEffect(() => {
     if (imageUrl.startsWith("http")) {
       setTextureUrl(imageUrl);
-    } else if (signedUrlData) {
-      setTextureUrl(signedUrlData.url);
+    } else if (publicSignedUrlData) {
+      setTextureUrl(publicSignedUrlData.url);
+    } else if (protectedSignedUrlData) {
+      setTextureUrl(protectedSignedUrlData.url);
     }
-  }, [imageUrl, signedUrlData]);
+  }, [imageUrl, publicSignedUrlData, protectedSignedUrlData]);
 
   // Load texture once URL is resolved
   useEffect(() => {

@@ -4,6 +4,37 @@ import { eq } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { db } from "@/lib/db";
 import { museums, frames } from "@/lib/db/schema";
+import { Storage } from "@google-cloud/storage";
+
+// Lazy initialization of Google Cloud Storage for public image access
+let storage: Storage | null = null;
+let bucket: ReturnType<Storage["bucket"]> | null = null;
+
+function getStorage() {
+  if (!storage) {
+    storage = new Storage({
+      projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+      credentials: process.env.GOOGLE_CLOUD_CREDENTIALS
+        ? JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS)
+        : undefined,
+    });
+  }
+  return storage;
+}
+
+function getBucket() {
+  if (!bucket) {
+    const bucketName = process.env.GOOGLE_CLOUD_STORAGE_BUCKET;
+    if (!bucketName) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Google Cloud Storage bucket not configured.",
+      });
+    }
+    bucket = getStorage().bucket(bucketName);
+  }
+  return bucket;
+}
 
 /**
  * Simple in-memory rate limiter for public endpoints
@@ -30,7 +61,10 @@ const rateLimitMiddleware = publicProcedure.use(async ({ ctx, next }) => {
     // Check if window has expired
     if (now > record.resetAt) {
       // Reset the counter
-      rateLimitMap.set(identifier, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+      rateLimitMap.set(identifier, {
+        count: 1,
+        resetAt: now + RATE_LIMIT_WINDOW,
+      });
     } else if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
       // Rate limit exceeded
       throw new TRPCError({
@@ -43,7 +77,10 @@ const rateLimitMiddleware = publicProcedure.use(async ({ ctx, next }) => {
     }
   } else {
     // First request from this identifier
-    rateLimitMap.set(identifier, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    rateLimitMap.set(identifier, {
+      count: 1,
+      resetAt: now + RATE_LIMIT_WINDOW,
+    });
   }
 
   // Clean up old entries periodically (every 100 requests)
@@ -182,6 +219,50 @@ export const publicRouter = createTRPCRouter({
         spawnPosition,
       };
     }),
+
+  /**
+   * Get signed URL for accessing an image (public access for shared museums/frames)
+   * Returns a URL that expires after the specified duration
+   */
+  getImageSignedUrl: rateLimitMiddleware
+    .input(
+      z.object({
+        filename: z.string(),
+        expiresIn: z.number().min(60).max(86400).optional().default(3600), // 1 hour default
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const bucketInstance = getBucket();
+        const file = bucketInstance.file(input.filename);
+
+        // Check if file exists
+        const [exists] = await file.exists();
+        if (!exists) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Image not found.",
+          });
+        }
+
+        // Generate signed URL
+        const [signedUrl] = await file.getSignedUrl({
+          action: "read",
+          expires: Date.now() + input.expiresIn * 1000,
+        });
+
+        return {
+          url: signedUrl,
+          expiresAt: new Date(Date.now() + input.expiresIn * 1000),
+        };
+      } catch (error) {
+        console.error("Error generating signed URL:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to generate signed URL.",
+        });
+      }
+    }),
 });
 
 /**
@@ -191,39 +272,75 @@ export const publicRouter = createTRPCRouter({
 function calculateSpawnPosition(
   position: number,
   side: string | null
-): { x: number; y: number; z: number; lookAt: { x: number; y: number; z: number } } {
-  // Main Hall frames (positions 0-8) are arranged in a 3x3 grid on the back wall
-  if (position >= 0 && position <= 8) {
-    const row = Math.floor(position / 3); // 0, 1, or 2
-    const col = position % 3; // 0, 1, or 2
+): {
+  x: number;
+  y: number;
+  z: number;
+  lookAt: { x: number; y: number; z: number };
+} {
+  const MAIN_HALL_WIDTH = 40;
+  const MAIN_HALL_DEPTH = 30;
+  const FRAME_HEIGHT = 5;
 
-    // Calculate position in front of the frame
-    // Assuming frames are centered at x: -10, 0, 10 and y: 5, 2.5, 0
-    const x = (col - 1) * 10; // -10, 0, 10
-    const y = 2.5 - row * 2.5; // 5, 2.5, 0
-    const z = -15; // Back wall is at z: -20, spawn 5 units in front
+  // Front entrance wall: positions 0-2
+  if (position >= 0 && position < 3) {
+    const x = (position - 1) * 10; // -10, 0, 10
+    const z = -8; // Spawn inside museum, facing the entrance wall
 
     return {
       x,
       y: 1.6, // Eye level
       z,
-      lookAt: { x, y, z: -20 }, // Look at the back wall
+      lookAt: { x, y: FRAME_HEIGHT, z: -0.3 }, // Look at frame on entrance wall
+    };
+  }
+
+  // Left wall: positions 3-5
+  if (position >= 3 && position < 6) {
+    const wallIndex = position - 3;
+    const frameZ = -(wallIndex * 10 + 5);
+    const x = -MAIN_HALL_WIDTH / 2 + 5; // Spawn 5 units from left wall
+
+    return {
+      x,
+      y: 1.6,
+      z: frameZ,
+      lookAt: { x: -MAIN_HALL_WIDTH / 2 + 0.3, y: FRAME_HEIGHT, z: frameZ }, // Look at left wall frame
+    };
+  }
+
+  // Right wall: positions 6-8
+  if (position >= 6 && position < 9) {
+    const wallIndex = position - 6;
+    const frameZ = -(wallIndex * 10 + 5);
+    const x = MAIN_HALL_WIDTH / 2 - 5; // Spawn 5 units from right wall
+
+    return {
+      x,
+      y: 1.6,
+      z: frameZ,
+      lookAt: { x: MAIN_HALL_WIDTH / 2 - 0.3, y: FRAME_HEIGHT, z: frameZ }, // Look at right wall frame
     };
   }
 
   // Extendable Hall frames (positions 9+)
   // Frames alternate left-right along the corridor
-  const hallPosition = position - 9;
-  const distanceAlongHall = hallPosition * 8; // 8 units between frames
+  const HALL_WIDTH = 10;
+  const HALL_SEGMENT_LENGTH = 8;
+  const extendableIndex = position - 9;
+  const segmentIndex = Math.floor(extendableIndex / 2);
 
-  // Determine which side the frame is on
+  // Actual frame position matches MuseumLayout
   const isLeftSide = side === "left";
-  const z = distanceAlongHall + 5; // Start after main hall
+  const frameX = isLeftSide ? -HALL_WIDTH / 2 + 0.3 : HALL_WIDTH / 2 - 0.3;
+  const frameY = 4;
+  const frameZ = -MAIN_HALL_DEPTH - HALL_SEGMENT_LENGTH * (segmentIndex + 0.5);
 
+  // Spawn in center of hall, facing the frame
   return {
-    x: isLeftSide ? -2 : 2, // Spawn slightly offset from center
+    x: 0,
     y: 1.6, // Eye level
-    z,
-    lookAt: { x: isLeftSide ? -8 : 8, y: 2, z }, // Look at the frame
+    z: frameZ,
+    lookAt: { x: frameX, y: frameY, z: frameZ }, // Look at the frame
   };
 }

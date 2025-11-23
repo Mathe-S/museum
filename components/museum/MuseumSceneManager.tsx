@@ -16,9 +16,16 @@ interface MuseumSceneManagerProps {
   collisionBoundaries?: THREE.Box3[];
   navigationEnabled?: boolean;
   cameraPosition?: [number, number, number];
+  cameraLookAt?: [number, number, number];
 }
 
-export function MuseumSceneManager({ children, collisionBoundaries = [], navigationEnabled = true, cameraPosition = [0, 1.6, 5] }: MuseumSceneManagerProps) {
+export function MuseumSceneManager({
+  children,
+  collisionBoundaries = [],
+  navigationEnabled = true,
+  cameraPosition = [0, 1.6, 5],
+  cameraLookAt,
+}: MuseumSceneManagerProps) {
   const themeMode = useMuseumStore((state) => state.themeMode);
   const [isMobile, setIsMobile] = useState(false);
   const [joystickDirection, setJoystickDirection] = useState({ x: 0, y: 0 });
@@ -27,17 +34,17 @@ export function MuseumSceneManager({ children, collisionBoundaries = [], navigat
   // Recreate TRPC client to bridge context into Canvas
   const [trpcClient] = useState(() => {
     // Handle SSR case
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       return trpc.createClient({
         links: [
           httpBatchLink({
-            url: '/api/trpc', // Fallback for SSR (though this component usually runs on client)
+            url: "/api/trpc", // Fallback for SSR (though this component usually runs on client)
             transformer: superjson,
           }),
         ],
       });
     }
-    
+
     return trpc.createClient({
       links: [
         httpBatchLink({
@@ -51,13 +58,13 @@ export function MuseumSceneManager({ children, collisionBoundaries = [], navigat
   useEffect(() => {
     // Detect if device is mobile
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768 || 'ontouchstart' in window);
+      setIsMobile(window.innerWidth <= 768 || "ontouchstart" in window);
     };
-    
+
     checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
+    window.addEventListener("resize", checkMobile);
+
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
   const handleJoystickChange = useCallback((x: number, y: number) => {
@@ -66,73 +73,87 @@ export function MuseumSceneManager({ children, collisionBoundaries = [], navigat
 
   return (
     <>
-    <Canvas
-      key={cameraPosition.join(',')} // Force re-render when camera position changes
-      camera={{
-        fov: 75,
-        near: 0.1,
-        far: 1000,
-        position: cameraPosition,
-      }}
-      gl={{
-        powerPreference: "high-performance",
-        antialias: typeof window !== "undefined" && window.innerWidth > 768,
-        alpha: false,
-        stencil: false, // Disable stencil buffer for performance
-        depth: true,
-      }}
-      dpr={
-        typeof window !== "undefined"
-          ? Math.min(window.devicePixelRatio, 2)
-          : 1
-      }
-      frameloop="always" // Always render for smooth controls
-      onCreated={({ gl, scene, camera }) => {
-        // Configure renderer for performance
-        gl.setClearColor(0x000000);
-        gl.shadowMap.enabled = true;
-        gl.shadowMap.type = THREE.PCFSoftShadowMap;
-        gl.shadowMap.autoUpdate = false; // Manual shadow updates for performance
-        
-        // Performance optimizations
-        gl.outputColorSpace = THREE.SRGBColorSpace;
+      <Canvas
+        key={cameraPosition.join(",")} // Force re-render when camera position changes
+        camera={{
+          fov: 75,
+          near: 0.1,
+          far: 1000,
+          position: cameraPosition,
+        }}
+        gl={{
+          powerPreference: "high-performance",
+          antialias: typeof window !== "undefined" && window.innerWidth > 768,
+          alpha: false,
+          stencil: false, // Disable stencil buffer for performance
+          depth: true,
+        }}
+        dpr={
+          typeof window !== "undefined"
+            ? Math.min(window.devicePixelRatio, 2)
+            : 1
+        }
+        frameloop="always" // Always render for smooth controls
+        onCreated={({ gl, scene, camera }) => {
+          // Configure renderer for performance
+          gl.setClearColor(0x000000);
+          gl.shadowMap.enabled = true;
+          gl.shadowMap.type = THREE.PCFSoftShadowMap;
+          gl.shadowMap.autoUpdate = false; // Manual shadow updates for performance
 
-        // Enable frustum culling (enabled by default in Three.js)
-        camera.matrixAutoUpdate = true;
+          // Performance optimizations
+          gl.outputColorSpace = THREE.SRGBColorSpace;
 
-        // Set scene fog for depth perception and performance (hides far objects)
-        scene.fog = new THREE.Fog(0x000000, 30, 120);
-      }}
-    >
-      {/* Lighting based on theme */}
-      <SceneLighting themeMode={themeMode} />
+          // Enable frustum culling (enabled by default in Three.js)
+          camera.matrixAutoUpdate = true;
 
-      {/* Center-screen click handler for pointer lock mode */}
-      <CenterClickHandler />
+          // Set scene fog for depth perception and performance (hides far objects)
+          scene.fog = new THREE.Fog(0x000000, 30, 120);
 
-      {/* Desktop navigation controls (WASD + mouse) */}
-      {!isMobile && collisionBoundaries.length > 0 && (
-        <DesktopControls collisionBoundaries={collisionBoundaries} enabled={navigationEnabled} />
-      )}
+          // Set initial camera look direction if provided
+          if (cameraLookAt) {
+            camera.lookAt(
+              new THREE.Vector3(
+                cameraLookAt[0],
+                cameraLookAt[1],
+                cameraLookAt[2]
+              )
+            );
+          }
+        }}
+      >
+        {/* Lighting based on theme */}
+        <SceneLighting themeMode={themeMode} />
 
-      {/* Mobile navigation controls (joystick + touch drag) */}
-      {isMobile && collisionBoundaries.length > 0 && (
-        <MobileControls 
-          collisionBoundaries={collisionBoundaries} 
-          enabled={navigationEnabled}
-          joystickDirection={joystickDirection}
-        />
-      )}
+        {/* Center-screen click handler for pointer lock mode */}
+        <CenterClickHandler />
 
-      {/* Children components (museum layout, frames, etc.) */}
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      </trpc.Provider>
-    </Canvas>
-    {/* Virtual joystick overlay for mobile */}
-    {isMobile && <VirtualJoystick onDirectionChange={handleJoystickChange} />}
+        {/* Desktop navigation controls (WASD + mouse) */}
+        {!isMobile && collisionBoundaries.length > 0 && (
+          <DesktopControls
+            collisionBoundaries={collisionBoundaries}
+            enabled={navigationEnabled}
+          />
+        )}
+
+        {/* Mobile navigation controls (joystick + touch drag) */}
+        {isMobile && collisionBoundaries.length > 0 && (
+          <MobileControls
+            collisionBoundaries={collisionBoundaries}
+            enabled={navigationEnabled}
+            joystickDirection={joystickDirection}
+          />
+        )}
+
+        {/* Children components (museum layout, frames, etc.) */}
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        </trpc.Provider>
+      </Canvas>
+      {/* Virtual joystick overlay for mobile */}
+      {isMobile && <VirtualJoystick onDirectionChange={handleJoystickChange} />}
     </>
   );
 }
@@ -228,11 +249,11 @@ function CenterClickHandler() {
       // Find the first frame mesh that was hit
       for (const intersect of intersects) {
         const object = intersect.object;
-        
+
         // Check if this is a frame mesh (has userData with frameId)
         if (object.userData && object.userData.frameId) {
           // Trigger click event on the frame
-          const clickEvent = new Event('frameClick');
+          const clickEvent = new Event("frameClick");
           (clickEvent as any).frameId = object.userData.frameId;
           window.dispatchEvent(clickEvent);
           break;
@@ -240,10 +261,10 @@ function CenterClickHandler() {
       }
     };
 
-    gl.domElement.addEventListener('click', handleClick);
+    gl.domElement.addEventListener("click", handleClick);
 
     return () => {
-      gl.domElement.removeEventListener('click', handleClick);
+      gl.domElement.removeEventListener("click", handleClick);
     };
   }, [camera, scene, gl]);
 

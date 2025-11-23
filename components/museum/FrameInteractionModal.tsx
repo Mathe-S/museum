@@ -5,7 +5,15 @@ import * as THREE from "three";
 import { Frame } from "@/lib/store/museum-store";
 import { trpc } from "@/lib/trpc/client";
 import { useMuseumStore } from "@/lib/store/museum-store";
-import { X, Camera, Trash2, Upload, ChevronDown } from "lucide-react";
+import {
+  X,
+  Camera,
+  Trash2,
+  Upload,
+  ChevronDown,
+  Link as LinkIcon,
+  Check,
+} from "lucide-react";
 
 interface FrameInteractionModalProps {
   frame: Frame | null;
@@ -53,6 +61,7 @@ export function FrameInteractionModal({
   const generateMutation = trpc.image.generate.useMutation();
   const createFrameMutation = trpc.frame.create.useMutation();
   const deleteFrameMutation = trpc.frame.delete.useMutation();
+  const generateFrameShareLink = trpc.frame.generateShareLink.useMutation();
 
   // Sort frames by position to make the dropdown ordered
   const sortedFrames = useMemo(() => {
@@ -171,6 +180,31 @@ export function FrameInteractionModal({
     setIsCameraActive(false);
     setIsVideoReady(false);
     setShowCamera(false);
+  };
+
+  const [shareSuccess, setShareSuccess] = useState(false);
+
+  const handleShare = async () => {
+    if (!frame || !frame.imageUrl || isPublicView) return;
+
+    try {
+      const result = await generateFrameShareLink.mutateAsync({ id: frame.id });
+      if (result.shareToken) {
+        // Build full URL on client side to ensure we have the correct origin
+        const fullUrl = `${window.location.origin}/frame/${result.shareToken}`;
+        await navigator.clipboard.writeText(fullUrl);
+        setShareSuccess(true);
+        setTimeout(() => {
+          setShareSuccess(false);
+        }, 3000);
+      }
+    } catch (err) {
+      console.error("Share error:", err);
+      setError("Failed to generate share link. Please try again.");
+      setTimeout(() => {
+        setError(null);
+      }, 3000);
+    }
   };
 
   if (!frame) return null;
@@ -572,12 +606,41 @@ export function FrameInteractionModal({
         <div className="p-4 overflow-y-auto flex-1">
           {activeView === "main" && (
             <div className="space-y-4">
-              {isPublicView ? (
+              {isPublicView && !isEmpty ? (
+                /* Public view with filled frame - show image and description */
+                <>
+                  {/* Frame Image Preview */}
+                  {frame.imageUrl && (
+                    <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-gray-100">
+                      <img
+                        src={frame.imageUrl}
+                        alt={frame.description || "Artwork"}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  )}
+
+                  {/* Frame Description */}
+                  {frame.description && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
+                        Description:
+                      </label>
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {frame.description}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* View-only notice */}
+                  <div className="p-3 bg-blue-50 border border-blue-200 text-blue-700 text-xs rounded-lg text-center">
+                    👁️ View-only mode • Editing not available
+                  </div>
+                </>
+              ) : isPublicView ? (
+                /* Public view with empty frame */
                 <div className="text-center py-8">
-                  <p className="text-gray-500 text-sm">
-                    This is a view-only mode. Editing is not available in shared
-                    galleries.
-                  </p>
+                  <p className="text-gray-500 text-sm">This frame is empty.</p>
                 </div>
               ) : (
                 <>
@@ -608,8 +671,19 @@ export function FrameInteractionModal({
                     </div>
                   )}
 
+                  {/* Success message for share */}
+                  {shareSuccess && (
+                    <div className="p-3 bg-green-50 border border-green-200 text-green-700 text-xs rounded-lg flex items-center gap-2">
+                      <Check className="w-4 h-4" />
+                      <span className="font-medium">
+                        Frame link copied to clipboard!
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Error messages */}
                   {error && (
-                    <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-xs rounded-lg">
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
                       {error}
                     </div>
                   )}
@@ -716,18 +790,38 @@ export function FrameInteractionModal({
                       Generate with AI
                     </button>
 
-                    {/* Delete Image */}
-                    {!isEmpty && (
-                      <button
-                        onClick={handleDelete}
-                        disabled={processingFrames[frame.id] === "deleting"}
-                        className="w-full py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        {processingFrames[frame.id] === "deleting"
-                          ? "Deleting..."
-                          : "Delete Image"}
-                      </button>
+                    {/* Share + Delete Row for filled frames */}
+                    {!isEmpty && !isPublicView && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleShare}
+                          disabled={generateFrameShareLink.isPending}
+                          className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+                        >
+                          {generateFrameShareLink.isPending ? (
+                            <>
+                              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Sharing...
+                            </>
+                          ) : (
+                            <>
+                              <LinkIcon className="w-4 h-4" />
+                              Share Frame
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={handleDelete}
+                          disabled={processingFrames[frame.id] === "deleting"}
+                          className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          {processingFrames[frame.id] === "deleting"
+                            ? "Deleting..."
+                            : "Delete Image"}
+                        </button>
+                      </div>
                     )}
                   </div>
 

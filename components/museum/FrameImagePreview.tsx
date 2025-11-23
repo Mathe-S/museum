@@ -6,13 +6,28 @@ interface FrameImagePreviewProps {
   description: string;
 }
 
-export function FrameImagePreview({ imageUrl, description }: FrameImagePreviewProps) {
+export function FrameImagePreview({
+  imageUrl,
+  description,
+}: FrameImagePreviewProps) {
   const [src, setSrc] = useState<string | null>(null);
 
-  const { data: signedUrlData } = trpc.image.getSignedUrl.useQuery(
+  // Try public endpoint first (for shared museums/frames)
+  const { data: publicSignedUrlData } = trpc.public.getImageSignedUrl.useQuery(
     { filename: imageUrl },
     {
       enabled: !!imageUrl && !imageUrl.startsWith("http"),
+      staleTime: 1000 * 60 * 55,
+      retry: false,
+    }
+  );
+
+  // Fallback to protected endpoint (for authenticated users)
+  const { data: protectedSignedUrlData } = trpc.image.getSignedUrl.useQuery(
+    { filename: imageUrl },
+    {
+      enabled:
+        !!imageUrl && !imageUrl.startsWith("http") && !publicSignedUrlData,
       staleTime: 1000 * 60 * 55,
     }
   );
@@ -20,10 +35,12 @@ export function FrameImagePreview({ imageUrl, description }: FrameImagePreviewPr
   useEffect(() => {
     if (imageUrl.startsWith("http")) {
       setSrc(imageUrl);
-    } else if (signedUrlData) {
-      setSrc(signedUrlData.url);
+    } else if (publicSignedUrlData) {
+      setSrc(publicSignedUrlData.url);
+    } else if (protectedSignedUrlData) {
+      setSrc(protectedSignedUrlData.url);
     }
-  }, [imageUrl, signedUrlData]);
+  }, [imageUrl, publicSignedUrlData, protectedSignedUrlData]);
 
   if (!src) {
     return (
@@ -35,12 +52,7 @@ export function FrameImagePreview({ imageUrl, description }: FrameImagePreviewPr
 
   return (
     <div className="relative bg-gray-100 rounded-lg overflow-hidden">
-      <img
-        src={src}
-        alt={description}
-        className="w-full h-64 object-contain"
-      />
+      <img src={src} alt={description} className="w-full h-64 object-contain" />
     </div>
   );
 }
-
